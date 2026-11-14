@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: Junk Seller
+## Notes: Auto-sells every junk (grey, coin-icon) item at any vendor and tracks what you earn.
+## Version: 2.0.0
+## SavedVariables: JunkSellerDB
+## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## AddonCompartmentFunc: JunkSeller_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: JunkSeller_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: JunkSeller_OnAddonCompartmentLeave
+
+JunkSeller.lua
+Stats.lua
+Minimap.lua
+UI.lua
+Panels.lua
