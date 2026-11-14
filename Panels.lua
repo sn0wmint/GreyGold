@@ -1,4 +1,4 @@
--- Junk Seller: the five tabs of the stats window, plus the small entry in
+-- Grey Gold: the five tabs of the stats window, plus the small entry in
 -- Esc > Options > AddOns. Each panel is built the first time it is shown.
 
 local _, ns = ...
@@ -305,7 +305,7 @@ end
 UI.builders[3] = function(parent)
     local p = UI.NewPanel(parent)
 
-    local search = UI.TryCreate("EditBox", "JunkSellerItemSearch", p, { "SearchBoxTemplate", "InputBoxTemplate" })
+    local search = UI.TryCreate("EditBox", "GreyGoldItemSearch", p, { "SearchBoxTemplate", "InputBoxTemplate" })
     search:SetSize(200, 20)
     search:SetPoint("TOPLEFT", 6, -2)
     search:SetAutoFocus(false)
@@ -399,8 +399,8 @@ end
 ----------------------------------------------------------------------------
 -- 5. Settings: options, never-sell list, about, reset
 ----------------------------------------------------------------------------
-StaticPopupDialogs["JUNKSELLER_RESET"] = {
-    text = "Delete all Junk Seller history for %s?\n\nThis cannot be undone.",
+StaticPopupDialogs["GREYGOLD_RESET"] = {
+    text = "Delete all " .. ns.TITLE .. " history for %s?\n\nThis cannot be undone.",
     button1 = YES or "Yes",
     button2 = NO or "No",
     OnAccept = function()
@@ -426,20 +426,21 @@ local function AcceptCursorItem()
 end
 
 local ABOUT = table.concat({
-    "|cffffd100Junk Seller|r v%s",
+    "|cffffd100" .. ns.TITLE .. "|r v%s",
     "",
     "Every item with the coin icon (grey quality with a sell value) is sold the moment you open any vendor, in quick batches. Selling stops as soon as the vendor window closes.",
     "",
     "|cffffd100Hold Shift|r while opening a vendor to skip selling once.",
     "",
     "|cffffd100Commands|r",
-    "/junk  " .. DIM .. "open this window|r",
-    "/junk toggle  " .. DIM .. "auto-sell on/off|r",
-    "/junk sell  " .. DIM .. "sell now (vendor open)|r",
-    "/junk keep <item>  " .. DIM .. "protect / unprotect|r",
-    "/junk quiet  " .. DIM .. "chat summary on/off|r",
-    "/junk minimap  " .. DIM .. "show/hide the button|r",
-    "/junk help  " .. DIM .. "list commands in chat|r",
+    "/greygold  " .. DIM .. "open this window|r",
+    "/greygold toggle  " .. DIM .. "auto-sell on/off|r",
+    "/greygold sell  " .. DIM .. "sell now (vendor open)|r",
+    "/greygold keep <item>  " .. DIM .. "protect / unprotect|r",
+    "/greygold quiet  " .. DIM .. "chat summary on/off|r",
+    "/greygold minimap  " .. DIM .. "show/hide the button|r",
+    "/greygold help  " .. DIM .. "list commands in chat|r",
+    DIM .. "/junk works as a shortcut for /greygold.|r",
 }, "\n")
 
 UI.builders[5] = function(parent)
@@ -459,7 +460,7 @@ UI.builders[5] = function(parent)
             "Announce (with a coin sound) when your lifetime junk gold passes 10g, 25g, 50g, 100g and beyond.",
             function() return ns.db.milestones end, function(v) ns.db.milestones = v end),
         UI.NewCheck(p, "Show minimap button",
-            "Drag it around the minimap edge to move it. You can always open this window with /junk.",
+            "Drag it around the minimap edge to move it. You can always open this window with /greygold (or /junk).",
             function() return not ns.db.minimap.hide end, function(v) ns.SetMinimapShown(v) end),
     }
     for i, cb in ipairs(p.checks) do cb:SetPoint("TOPLEFT", 0, -22 - (i - 1) * 28) end
@@ -521,7 +522,7 @@ UI.builders[5] = function(parent)
     p.reset:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", rx, 4)
     p.reset:SetScript("OnClick", function()
         UI.pendingReset = Scope()
-        StaticPopup_Show("JUNKSELLER_RESET", ns.ScopeLabel(UI.pendingReset))
+        StaticPopup_Show("GREYGOLD_RESET", ns.ScopeLabel(UI.pendingReset))
     end)
 
     function p:Refresh()
@@ -539,13 +540,13 @@ UI.builders[5] = function(parent)
 end
 
 ----------------------------------------------------------------------------
--- Esc > Options > AddOns > Junk Seller
+-- Esc > Options > AddOns > Grey Gold
 ----------------------------------------------------------------------------
 ns.RegisterCallback(function(kind)
     if kind ~= "init" then return end
     local panel = CreateFrame("Frame")
-    panel.name = "Junk Seller"
-    local title = UI.Text(panel, "GameFontNormalLarge", "Junk Seller", "LEFT")
+    panel.name = ns.TITLE
+    local title = UI.Text(panel, "GameFontNormalLarge", ns.TITLE, "LEFT")
     title:SetPoint("TOPLEFT", 16, -16)
     local desc = UI.Text(panel, "GameFontHighlight",
         "Automatically sells every junk (coin-icon) item when you open a vendor, and keeps a history of what you earned.\n\nVersion " .. ns.VERSION, "LEFT")
@@ -554,14 +555,14 @@ ns.RegisterCallback(function(kind)
     local open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     open:SetSize(180, 24)
     open:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -14)
-    open:SetText("Open Junk Seller")
+    open:SetText("Open " .. ns.TITLE)
     open:SetScript("OnClick", function()
         if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
         ns.ShowWindow(5)
     end)
 
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-        local category = Settings.RegisterCanvasLayoutCategory(panel, "Junk Seller")
+        local category = Settings.RegisterCanvasLayoutCategory(panel, ns.TITLE)
         Settings.RegisterAddOnCategory(category)
     elseif InterfaceOptions_AddCategory then
         InterfaceOptions_AddCategory(panel)

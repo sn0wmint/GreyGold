@@ -1,4 +1,4 @@
--- Junk Seller: minimap button (drag it around the edge) and addon-compartment entry.
+-- Grey Gold: minimap button (drag it around the edge) and addon-compartment entry.
 
 local ADDON, ns = ...
 
@@ -60,7 +60,7 @@ end
 ----------------------------------------------------------------------------
 function ns.FillTooltip(tt)
     local db = ns.db
-    tt:AddDoubleLine("Junk Seller", db.enabled and "|cff00ff00Auto-sell on|r" or "|cffff4040Auto-sell off|r", 1, 0.82, 0)
+    tt:AddDoubleLine(ns.TITLE, db.enabled and "|cff00ff00Auto-sell on|r" or "|cffff4040Auto-sell off|r", 1, 0.82, 0)
     local t = ns.Totals("ALL")
     tt:AddLine(" ")
     tt:AddDoubleLine("Today", ns.Money(t.today.c, true), 1, 1, 1, 1, 1, 1)
@@ -98,15 +98,15 @@ local function ShowTooltip(owner)
     GameTooltip:Show()
 end
 
-function JunkSeller_OnAddonCompartmentClick(_, mouseButton) ns.HandleClick(mouseButton) end
-function JunkSeller_OnAddonCompartmentEnter(_, owner) ShowTooltip(owner) end
-function JunkSeller_OnAddonCompartmentLeave() GameTooltip:Hide() end
+function GreyGold_OnAddonCompartmentClick(_, mouseButton) ns.HandleClick(mouseButton) end
+function GreyGold_OnAddonCompartmentEnter(_, owner) ShowTooltip(owner) end
+function GreyGold_OnAddonCompartmentLeave() GameTooltip:Hide() end
 
 ----------------------------------------------------------------------------
 -- The button itself (same look as standard minimap buttons)
 ----------------------------------------------------------------------------
 local function Create()
-    button = CreateFrame("Button", "JunkSellerMinimapButton", Minimap)
+    button = CreateFrame("Button", "GreyGoldMinimapButton", Minimap)
     button:SetSize(31, 31)
     button:SetFrameStrata("MEDIUM")
     button:SetFrameLevel(8)

@@ -1,4 +1,4 @@
--- Junk Seller: sells every junk item (grey quality, the ones that show the gold
+-- Grey Gold: sells every junk item (grey quality, the ones that show the gold
 -- coin icon at a vendor) as soon as you open any merchant, and records what it
 -- sold. Hold Shift while opening a vendor to skip auto-selling that one time.
 
@@ -6,6 +6,7 @@ local ADDON, ns = ...
 
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
 ns.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or "?"
+ns.TITLE = (GetMeta and GetMeta(ADDON, "Title")) or "Grey Gold"
 ns.ICON = "Interface\\Icons\\INV_Misc_Coin_02"
 
 ns.GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
@@ -27,7 +28,7 @@ local MAX_TRIES  = 3    -- then give up on that slot (e.g. a vendor that refuses
 -- Shared helpers
 ----------------------------------------------------------------------------
 function ns.Print(msg)
-    print("|cff33ff99Junk Seller|r: " .. msg)
+    print("|cff33ff99" .. ns.TITLE .. "|r: " .. msg)
 end
 
 -- Coin-icon money string. trimCopper drops the copper once there is gold.
@@ -87,8 +88,8 @@ end
 -- Settings
 ----------------------------------------------------------------------------
 local function InitDB()
-    local db = JunkSellerDB or {}
-    JunkSellerDB = db
+    local db = GreyGoldDB or {}
+    GreyGoldDB = db
     if db.enabled == nil then db.enabled = true end
     if db.summary == nil then db.summary = true end
     if db.milestones == nil then db.milestones = true end
@@ -268,18 +269,19 @@ end)
 local function Help()
     local P = ns.Print
     P("v" .. ns.VERSION .. " - auto-sell is " .. (ns.db.enabled and "|cff00ff00on|r" or "|cffff4040off|r") .. ".")
-    P("/junk - open the stats window")
-    P("/junk toggle - turn auto-sell on/off")
-    P("/junk sell - sell junk now (vendor must be open)")
-    P("/junk keep <item> - protect/unprotect an item (shift-click it in)")
-    P("/junk quiet - toggle the chat summary")
-    P("/junk minimap - show/hide the minimap button")
+    P("/greygold - open the stats window")
+    P("/greygold toggle - turn auto-sell on/off")
+    P("/greygold sell - sell junk now (vendor must be open)")
+    P("/greygold keep <item> - protect/unprotect an item (shift-click it in)")
+    P("/greygold quiet - toggle the chat summary")
+    P("/greygold minimap - show/hide the minimap button")
+    P("/junk works as a shortcut for /greygold.")
     P("Hold Shift while opening a vendor to skip selling once.")
 end
 
-SLASH_JUNKSELLER1 = "/junk"
-SLASH_JUNKSELLER2 = "/junkseller"
-SlashCmdList.JUNKSELLER = function(msg)
+SLASH_GREYGOLD1 = "/greygold"
+SLASH_GREYGOLD2 = "/junk"
+SlashCmdList.GREYGOLD = function(msg)
     local cmd, rest = strtrim(msg or ""):match("^(%S*)%s*(.-)$")
     cmd = strlower(cmd or "")
     if cmd == "" then
@@ -300,7 +302,7 @@ SlashCmdList.JUNKSELLER = function(msg)
         if id then
             ns.ToggleNeverSell(tonumber(id), rest:match("%[(.-)%]"))
         else
-            ns.Print("usage: /junk keep <shift-click an item>")
+            ns.Print("usage: /greygold keep <shift-click an item>")
         end
     elseif cmd == "settings" or cmd == "options" or cmd == "config" then
         ns.ShowWindow(5)

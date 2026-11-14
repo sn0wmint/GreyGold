@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: Grey Gold
+## Notes: Sells every grey item at any vendor and tracks the gold you earn.
+## Version: 2.0.0
+## SavedVariables: GreyGoldDB
+## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## AddonCompartmentFunc: GreyGold_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: GreyGold_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: GreyGold_OnAddonCompartmentLeave
+
+GreyGold.lua
+Stats.lua
+Minimap.lua
+UI.lua
+Panels.lua

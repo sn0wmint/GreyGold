@@ -1,4 +1,4 @@
--- Junk Seller: main window shell plus small reusable widgets
+-- Grey Gold: main window shell plus small reusable widgets
 -- (stat tile, bar chart, sortable list, checkbox, toggle buttons).
 -- Nothing here is built until the window is first opened.
 
@@ -385,7 +385,7 @@ function UI.NewList(parent, w, h, columns, opts)
     line:SetPoint("TOPLEFT", 0, -19)
     line:SetPoint("TOPRIGHT", -24, -19)
 
-    local sf = CreateFrame("ScrollFrame", "JunkSellerList" .. listCount, L, "UIPanelScrollFrameTemplate")
+    local sf = CreateFrame("ScrollFrame", "GreyGoldList" .. listCount, L, "UIPanelScrollFrameTemplate")
     sf:SetPoint("TOPLEFT", 0, -21)
     sf:SetPoint("BOTTOMRIGHT", -24, 0)
     sf.scrollBarHideable = true
@@ -487,7 +487,7 @@ end
 
 function UI.Build()
     if UI.frame then return UI.frame end
-    local f, template = UI.TryCreate("Frame", "JunkSellerFrame", UIParent,
+    local f, template = UI.TryCreate("Frame", "GreyGoldFrame", UIParent,
         { "ButtonFrameTemplate", "PortraitFrameTemplate", "BasicFrameTemplateWithInset" })
     UI.frame = f
     f:Hide()
@@ -508,10 +508,10 @@ function UI.Build()
     if p then f:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else f:SetPoint("CENTER") end
 
     if f.SetTitle then
-        f:SetTitle("Junk Seller")
+        f:SetTitle(ns.TITLE)
     else
         local title = f.TitleText or (f.TitleContainer and f.TitleContainer.TitleText)
-        if title then title:SetText("Junk Seller") end
+        if title then title:SetText(ns.TITLE) end
     end
     if f.SetPortraitToAsset then
         f:SetPortraitToAsset(ns.ICON)
@@ -523,7 +523,7 @@ function UI.Build()
     if template == "ButtonFrameTemplate" and ButtonFrameTemplate_HideButtonBar then
         pcall(ButtonFrameTemplate_HideButtonBar, f)
     end
-    if UISpecialFrames then tinsert(UISpecialFrames, "JunkSellerFrame") end  -- Esc closes it
+    if UISpecialFrames then tinsert(UISpecialFrames, "GreyGoldFrame") end  -- Esc closes it
     f:HookScript("OnShow", function() UI.Sound("IG_CHARACTER_INFO_OPEN") end)
     f:HookScript("OnHide", function() UI.Sound("IG_CHARACTER_INFO_CLOSE") end)
 
@@ -542,7 +542,7 @@ function UI.Build()
 
     f.Tabs = {}
     for i, name in ipairs(UI.TABS) do
-        local tab = UI.TryCreate("Button", "JunkSellerFrameTab" .. i, f,
+        local tab = UI.TryCreate("Button", "GreyGoldFrameTab" .. i, f,
             { "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate" })
         tab:SetID(i)
         tab:SetText(name)

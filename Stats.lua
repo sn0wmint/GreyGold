@@ -1,4 +1,4 @@
--- Junk Seller: history storage and the queries behind the stats window.
+-- Grey Gold: history storage and the queries behind the stats window.
 -- No frames here. Scope is "ALL" (every character) or a "Name-Realm" key.
 
 local ADDON, ns = ...
