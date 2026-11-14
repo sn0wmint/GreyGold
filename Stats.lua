@@ -207,7 +207,10 @@ function ns.RecordHaul(sales, zone, opts)
     local z = day.zones[zone]
     if not z then z = { 0, 0 }; day.zones[zone] = z end
     z[1] = z[1] + copper
-    if newVisit then day.v, z[2] = day.v + 1, z[2] + 1 end
+    -- Count the visit once. A buyback can remove the day or zone entry mid-visit;
+    -- a later sale in that same visit must not leave it at zero visits.
+    if newVisit or day.v == 0 then day.v = day.v + 1 end
+    if newVisit or z[2] == 0 then z[2] = z[2] + 1 end
 
     local total = char.total
     total.c, total.n, total.s = total.c + copper, total.n + units, total.s + #sales

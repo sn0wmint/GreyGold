@@ -480,7 +480,7 @@ UI.builders[4] = function(parent)
         if farm then
             local other = ns.UncreditedTotal(scope, from, to)
             if other > 0 then
-                text = text .. format("  %s|||r  %s from mail, trade, bank or unknown origin (no zone credit)",
+                text = text .. format("  %s|||r  %s not looted by you: mail, trade, bank, other (no zone credit)",
                     DIM, ns.Money(other, true))
             end
             self.farm:SetData(list)
@@ -670,10 +670,10 @@ UI.builders[ns.TAB_SETTINGS] = function(parent)
         UI.NewCheck(p, "Show minimap button",
             "Drag it around the minimap edge to move it. You can always open this window with /greygold (or /junk).",
             function() return not ns.db.minimap.hide end, function(v) ns.SetMinimapShown(v) end),
-        UI.NewCheck(p, "Suggest junk to delete when bags are full",
+        UI.NewCheck(p, "Bags full: suggest junk to delete",
             "When your bags fill up, a chat line names your cheapest junk stack so you can make room. Nothing is ever deleted for you.",
             function() return ns.db.suggest end, function(v) ns.db.suggest = v end),
-        UI.NewCheck(p, "Show junk value on the default backpack",
+        UI.NewCheck(p, "Junk value next to the default backpack",
             "A small label next to the default backpack shows the junk in your bags. Bag addons like Bagnon can show the same thing in their data bar instead (pick \"Grey Gold\" there).",
             function() return ns.db.bagLabel end, function(v) ns.db.bagLabel = v; ns.Notify("bags") end),
     }

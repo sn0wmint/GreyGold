@@ -190,7 +190,7 @@ Hold **Shift** while opening a vendor to skip auto-selling that one time.
 - Only sales the server confirms (the item has left your bags) are recorded.
 - Grey items you sell by hand are recorded once the vendor's payment arrives. Items that leave your bags without a payment (destroyed, equipped, used) are not sales. Gold from selling anything that isn't grey is never counted.
 - When junk arrives in your bags, Grey Gold notes where it came from: the mob, chest, fishing catch or container you looted, or mail, trade, the bank or "other". When you sell it, the oldest copies are matched first, so a stack from three different mobs becomes three Log rows. Mob names come from units you have hovered, targeted or seen a nameplate for; inside dungeons the game can hide them, and the Log then says "Unknown creature".
-- A buyback from the vendor's Buyback tab takes that sale back out of the daily, item, zone and character totals. Milestones you already reached stay reached.
+- A buyback from the vendor's Buyback tab takes that sale back out of the daily, item, zone and character totals. Milestones you already reached stay reached. If you buy something back while auto-sell is still running, the run stops so the item isn't sold again at once; `/greygold sell` sells the rest.
 - History is saved account-wide in `GreyGoldDB`, one entry per item per day per character, plus the sales log. No libraries are bundled. The Bagnon data-bar feed is only offered when another addon (such as Bagnon) provides the library. The window is only built the first time you open it.
 
 ## Feedback and bug reports

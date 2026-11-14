@@ -18,6 +18,7 @@ local FRAME_GRACE    = 2    -- seconds after mail/trade/bank closes that new jun
 local CAST_WINDOW    = 10   -- seconds a spell target ("Opening" a chest) names the next object loot
 local BUYBACK_WINDOW = 2    -- seconds after BuybackItem() that new junk is a buyback
 local HAND_WINDOW    = 3    -- seconds a hand-sale loss and its payment wait for each other
+local EXACT_DELAY    = 0.3  -- seconds a payment waits before a grey item may claim it (bag update may trail it)
 local POOL_DELAY     = 1    -- seconds before merged payments are shared out (all updates in by then)
 local OWED_WINDOW    = 6    -- seconds auto-sell gold may lag behind its tally
 local SUGGEST_EVERY  = 30   -- seconds between "bags full" suggestions
@@ -35,6 +36,7 @@ local merchantOpen, merchantClosedAt = false, -100
 local buybackAt = -100
 local deferred = {}    -- buybacks seen while auto-sell was busy
 local cursorItem       -- item last picked up onto the cursor
+local cursorEmptyAt    -- GetTime() the cursor was seen empty again
 local destroyed = {}   -- [itemID] = GetTime() it was deleted
 local losses = {}      -- items that left the bags at a vendor, waiting for their payment
 local golds = {}       -- payments received at a vendor, waiting for their item
@@ -251,8 +253,33 @@ end
 ----------------------------------------------------------------------------
 -- Junk arriving and leaving
 ----------------------------------------------------------------------------
+-- A bought-back copy whose sale hasn't been recorded yet (its loss is still
+-- waiting for a payment): the two cancel out, and nothing is recorded.
+-- Returns how many copies are left to undo.
+local function CancelLosses(id, n)
+    local i = 1
+    while n > 0 and i <= #losses do
+        local l = losses[i]
+        if l.junk and l.id == id then
+            local use = math.min(l.n, n)
+            local paid = (prices[id] or 0) * use
+            l.n, n = l.n - use, n - use
+            l.value = (prices[id] or 0) * l.n
+            for g, gold in ipairs(golds) do  -- its payment, if it already came in
+                if gold.amount == paid then table.remove(golds, g); break end
+            end
+            if l.n == 0 then table.remove(losses, i) else i = i + 1 end
+        else
+            i = i + 1
+        end
+    end
+    return n
+end
+
 -- Bought back: cancel that sale in the totals and give the copies their sources back.
 function Buyback(id, n)
+    n = CancelLosses(id, n)
+    if n <= 0 then return end
     local rows = ns.UndoSale(id, n, carry.session)
     local back = 0
     for _, r in ipairs(rows) do
@@ -294,6 +321,7 @@ local function OnLoss(id, n, junk)
         end
         if n > 0 then
             losses[#losses + 1] = { id = id, n = n, value = (prices[id] or 0) * n, junk = junk, at = GetTime() }
+            C_Timer.After(EXACT_DELAY + 0.05, Settle)
             C_Timer.After(POOL_DELAY + 0.1, Settle)
             C_Timer.After(HAND_WINDOW + 0.1, Settle)
         end
@@ -340,12 +368,16 @@ function Settle()
             if o.amount == amount then table.remove(owed, j); matched = true; break end
         end
         if not matched then
-            local li = FindLoss(amount, true)
+            -- If a grey and a non-grey item of the same price both left the bags,
+            -- the payment goes to the non-grey one: junk is never over-counted.
+            local li = FindLoss(amount, false)
             if li then
-                Sell(li); matched = true
-            else
-                li = FindLoss(amount, false)
-                if li then table.remove(losses, li); matched = true end
+                table.remove(losses, li); matched = true
+            elseif now - golds[i].at >= EXACT_DELAY then
+                -- Waited a moment first: the bag update for a non-grey item sold
+                -- at the same time can arrive just after its payment.
+                li = FindLoss(amount, true)
+                if li then Sell(li); matched = true end
             end
         end
         if matched then table.remove(golds, i) else i = i + 1 end
@@ -541,22 +573,33 @@ end
 -- Hooks and events
 ----------------------------------------------------------------------------
 if BuybackItem then
-    hooksecurefunc("BuybackItem", function() buybackAt = GetTime() end)
+    hooksecurefunc("BuybackItem", function()
+        buybackAt = GetTime()
+        if ns.HaltSelling then ns.HaltSelling() end  -- or the run would sell it again at once
+    end)
 end
 
+-- Remember what is on the cursor, so a deleted item can be told from a sold one.
+-- The cursor is already empty when the delete hook runs, hence the short memory.
 local function NoteCursor()
     local ok, kind, id = pcall(GetCursorInfo)
-    if ok and kind == "item" and id then cursorItem = id end
+    if ok and kind == "item" and id then
+        cursorItem, cursorEmptyAt = id, nil
+    elseif cursorItem and not cursorEmptyAt then
+        cursorEmptyAt = GetTime()
+    end
 end
 if C_Container and C_Container.PickupContainerItem then
     hooksecurefunc(C_Container, "PickupContainerItem", NoteCursor)
 end
 if DeleteCursorItem then
     hooksecurefunc("DeleteCursorItem", function()
-        if cursorItem then
+        -- Only an item that was on the cursor just now; not one put down long ago.
+        if cursorItem and (not cursorEmptyAt or GetTime() - cursorEmptyAt < 0.5) then
             destroyed[cursorItem] = GetTime()
             C_Timer.After(0.2, Settle)
         end
+        cursorItem, cursorEmptyAt = nil, nil
     end)
 end
 
@@ -590,6 +633,7 @@ frame:SetScript("OnEvent", function(_, event, a1, a2)
         local m = GetMoney()
         if lastMoney and m > lastMoney and InMerchantWindow() then
             golds[#golds + 1] = { amount = m - lastMoney, at = GetTime() }
+            C_Timer.After(EXACT_DELAY + 0.05, Settle)
             C_Timer.After(POOL_DELAY + 0.1, Settle)
             C_Timer.After(HAND_WINDOW + 0.1, Settle)
         end
@@ -619,11 +663,14 @@ frame:SetScript("OnEvent", function(_, event, a1, a2)
     elseif event == "PLAYER_TARGET_CHANGED" then
         Remember("target")
     elseif event == "NAME_PLATE_UNIT_ADDED" then
-        Remember(a1)
+        Remember(Plain(a1))
     elseif event == "UNIT_SPELLCAST_SENT" then
-        local target = Plain(a2)
-        if a1 == "player" and type(target) == "string" and target ~= "" then
-            lastCast = { name = target, at = GetTime() }
+        -- "Opening" a chest or node names it as the spell target. Spells cast at
+        -- your current target (a mob) are not object names.
+        local unit, target = Plain(a1), Plain(a2)
+        if unit == "player" and type(target) == "string" and target ~= "" then
+            local _, targetName = UnitInfo("target")
+            if target ~= targetName then lastCast = { name = target, at = GetTime() } end
         end
     elseif event == "CURSOR_CHANGED" then
         NoteCursor()

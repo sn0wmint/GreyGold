@@ -160,6 +160,7 @@ end
 local merchantOpen = false
 local running = false
 local tallyPending = false  -- vendor closed mid-run; the last sales are still being counted
+local halted = false        -- run is winding down: nothing new is sent, in-flight sales finish
 local ticker
 local passes = 0
 local pending = {}  -- [bag*1000+slot] = { bag, slot, itemID, count, value, name }
@@ -169,6 +170,14 @@ ns.visit = 0         -- goes up once per vendor window, so a visit is only count
 
 -- True while auto-sell is busy, so hand sales and bag bookkeeping wait for it.
 function ns.IsSelling() return running or tallyPending end
+
+-- The player bought something back while auto-sell was running: stop sending
+-- sales, or the run would sell the bought-back item again straight away.
+function ns.HaltSelling()
+    if not running or halted then return end
+    halted = true
+    ns.Print("auto-sell stopped because you bought an item back. Type /greygold sell to sell the rest.")
+end
 
 -- Same rule the default UI uses to show the coin icon, minus protected items.
 local function IsJunk(info)
@@ -246,8 +255,10 @@ local function Pass()
                 local key = bag * 1000 + slot
                 local p = pending[key]
                 if p and p.itemID ~= info.itemID then p = nil end
-                if info.isLocked or sent >= BATCH_SIZE or (p and now - p.sentAt < RETRY_AFTER) then
+                if info.isLocked or (p and now - p.sentAt < RETRY_AFTER) or (sent >= BATCH_SIZE and not halted) then
                     waiting = waiting + 1  -- sale in flight, or next batch
+                elseif halted then
+                    -- winding down: send nothing new
                 elseif not p or p.tries < MAX_TRIES then
                     if not p then
                         local count = info.stackCount or 1
@@ -271,7 +282,7 @@ end
 
 local function Start()
     if running or not merchantOpen then return end
-    running, passes = true, 0
+    running, passes, halted = true, 0, false
     pending = {}
     ticker = C_Timer.NewTicker(INTERVAL, Pass)
     Pass()  -- first batch goes out immediately
