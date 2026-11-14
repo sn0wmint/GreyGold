@@ -26,7 +26,7 @@ The **Showing** dropdown switches between **All characters** and any single char
   - biggest vendor haul and priciest single sale;
   - current and longest selling streak;
   - bag slots freed, active days, average per active day, and the date tracking started.
-- **History**: daily or weekly view with a chart and a list of periods. Selecting a period shows each item sold that day or week (quantity, gold, gold per item) and which zones the gold came from.
+- **History**: daily or weekly view with a chart and a list of periods. Selecting a period shows each item sold that day or week (quantity, gold, gold per item) and which zones you sold it in.
 - **Items**: an all-time leaderboard you can sort and search. Shift-click links an item in chat; right-click protects it from selling.
 - **Zones**: gold, visits, gold per visit and share for each zone you sold in.
 - **Settings**: the options, the never-sell list (drag an item onto the slot), the slash commands, and a reset button. Reset clears the history for whichever scope the dropdown is showing.
@@ -55,6 +55,10 @@ Hold **Shift** while opening a vendor to skip auto-selling that one time.
 - Sales go out in batches of 12 every 0.2s, and failed sales are retried. Selling stops the moment the vendor window closes, because outside a vendor the game would use or equip the item instead.
 - Only sales the server confirms (the item has left your bags) are recorded.
 - History is saved account-wide in `GreyGoldDB`, one entry per item per day per character. No libraries are used, and the window is only built the first time you open it.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Disclaimer
 

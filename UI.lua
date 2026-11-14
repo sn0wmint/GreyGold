@@ -152,6 +152,7 @@ end
 -- Bar chart. series = { { key, label, c, n, current, kind }, ... }
 ----------------------------------------------------------------------------
 local PAD_TOP, PAD_BOTTOM, PAD_X = 18, 18, 8
+local BASE_H = 1  -- baseline thickness; bars stand on top of it
 
 local function BarEnter(self)
     local s = self.data
@@ -184,7 +185,7 @@ local function NewBar(chart)
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
     b.label = UI.Text(chart, "GameFontDisableSmall")
-    b.label:SetPoint("TOP", b, "BOTTOM", 0, -4)
+    b.label:SetPoint("TOP", b, "BOTTOM", 0, -4 - BASE_H)
     b:SetScript("OnEnter", BarEnter)
     b:SetScript("OnLeave", UI.HideTooltip)
     b:SetScript("OnClick", BarClick)
@@ -205,7 +206,7 @@ function UI.NewChart(parent, w, h)
     end
     local base = c:CreateTexture(nil, "BORDER")
     base:SetColorTexture(GOLD_R, GOLD_G, GOLD_B, 0.3)
-    base:SetHeight(1)
+    base:SetHeight(BASE_H)
     base:SetPoint("BOTTOMLEFT", PAD_X, PAD_BOTTOM)
     base:SetPoint("BOTTOMRIGHT", -PAD_X, PAD_BOTTOM)
 
@@ -230,9 +231,9 @@ function UI.NewChart(parent, w, h)
                 local s = series[i]
                 b.data = s
                 b:ClearAllPoints()
-                b:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", PAD_X + (i - 1) * slot + (slot - barW) / 2, PAD_BOTTOM)
-                b:SetSize(barW, plotH)
-                b.fill:SetHeight(peak > 0 and math.max(1, plotH * s.c / peak) or 1)
+                b:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", PAD_X + (i - 1) * slot + (slot - barW) / 2, PAD_BOTTOM + BASE_H)
+                b:SetSize(barW, plotH - BASE_H)
+                b.fill:SetHeight(peak > 0 and math.max(1, (plotH - BASE_H) * s.c / peak) or 1)
                 if selectedKey and s.key == selectedKey then
                     b.fill:SetColorTexture(0.45, 0.8, 1, 1)
                 elseif s.c == 0 then

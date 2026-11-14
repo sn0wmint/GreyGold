@@ -136,7 +136,7 @@ UI.builders[1] = function(parent)
                 tt:AddLine("Biggest single vendor visit", 1, 0.82, 0)
                 tt:AddDoubleLine("Gold", ns.Money(haul.c), 1, 1, 1, 1, 1, 1)
                 tt:AddDoubleLine("Items", ns.Num(haul.n), 1, 1, 1, 1, 1, 1)
-                tt:AddDoubleLine("Zone", haul.zone or "?", 1, 1, 1, 1, 1, 1)
+                tt:AddDoubleLine("Sold in", haul.zone or "?", 1, 1, 1, 1, 1, 1)
                 tt:AddDoubleLine("Date", ns.FormatDay(haul.day, true), 1, 1, 1, 1, 1, 1)
                 if scope == "ALL" then tt:AddDoubleLine("Character", ns.CharLabel(r.haulChar), 1, 1, 1) end
             end)
@@ -292,7 +292,7 @@ UI.builders[2] = function(parent)
         for i = 1, math.min(#zones, 4) do
             parts[i] = format("%s %d%%", zones[i].zone, floor(zones[i].share * 100 + 0.5))
         end
-        self.zones:SetText(#parts > 0 and ("Zones: " .. table.concat(parts, ", ")) or "")
+        self.zones:SetText(#parts > 0 and ("Sold in: " .. table.concat(parts, ", ")) or "")
         self.items:SetData(ns.ItemTable(scope, from, to), true)
     end
 
@@ -356,12 +356,12 @@ UI.builders[3] = function(parent)
 end
 
 ----------------------------------------------------------------------------
--- 4. Zones: where the junk money comes from
+-- 4. Zones: where you sold your junk (zone you were in at the vendor)
 ----------------------------------------------------------------------------
 UI.builders[4] = function(parent)
     local p = UI.NewPanel(parent)
 
-    local h = UI.Header(p, "Where your junk money comes from", W - 220)
+    local h = UI.Header(p, "Where you sold your junk", W - 220)
     h:SetPoint("TOPLEFT", 2, -4)
     p.info = UI.Text(p, "GameFontHighlightSmall", nil, "RIGHT")
     p.info:SetPoint("TOPRIGHT", -4, -5)
