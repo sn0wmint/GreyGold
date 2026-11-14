@@ -73,6 +73,9 @@ function ns.FillTooltip(tt)
     else
         tt:AddLine("No junk in your bags.", 0.62, 0.62, 0.62)
     end
+    local goal, left = ns.MilestoneProgress()
+    tt:AddDoubleLine("Next milestone " .. ns.Money(goal * 10000), ns.Money(left, true) .. " to go",
+        1, 0.82, 0, 1, 1, 1)
     tt:AddLine(" ")
     tt:AddLine("|cffffd100Left-click|r  open stats", 0.85, 0.85, 0.85)
     tt:AddLine("|cffffd100Right-click|r  settings", 0.85, 0.85, 0.85)
@@ -86,7 +89,7 @@ function ns.HandleClick(mouseButton)
     if IsShiftKeyDown() then
         ns.SetEnabled(not ns.db.enabled)
     elseif mouseButton == "RightButton" then
-        if open and ns.db.ui.tab == 5 then frame:Hide() else ns.ShowWindow(5) end
+        if open and ns.db.ui.tab == ns.TAB_SETTINGS then frame:Hide() else ns.ShowWindow(ns.TAB_SETTINGS) end
     else
         if open then frame:Hide() else ns.ShowWindow(1) end
     end

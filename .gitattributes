@@ -1,3 +1,4 @@
 # Keep repo-only files out of release zips (git archive / GitHub "Download ZIP")
 media/ export-ignore
+IDEAS.md export-ignore
 .gitattributes export-ignore

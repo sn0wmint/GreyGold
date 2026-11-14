@@ -9,7 +9,7 @@ ns.UI = UI
 
 local W, H = 640, 480
 UI.BODY_W, UI.BODY_H = 608, 392
-UI.TABS = { "Overview", "History", "Items", "Zones", "Settings" }
+UI.TABS = { "Overview", "History", "Items", "Zones", "Log", "Settings" }
 UI.builders = {}  -- [tab] = function(parent) -> panel with :Refresh(); filled by Panels.lua
 local panels = {}
 
@@ -508,11 +508,12 @@ function UI.Build()
     f:ClearAllPoints()
     if p then f:SetPoint(p[1], UIParent, p[2], p[3], p[4]) else f:SetPoint("CENTER") end
 
+    local titleText = ns.TITLE .. " v" .. ns.VERSION
     if f.SetTitle then
-        f:SetTitle(ns.TITLE)
+        f:SetTitle(titleText)
     else
         local title = f.TitleText or (f.TitleContainer and f.TitleContainer.TitleText)
-        if title then title:SetText(ns.TITLE) end
+        if title then title:SetText(titleText) end
     end
     if f.SetPortraitToAsset then
         f:SetPortraitToAsset(ns.ICON)

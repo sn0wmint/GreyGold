@@ -9,6 +9,8 @@ ns.VERSION = (GetMeta and GetMeta(ADDON, "Version")) or "?"
 ns.TITLE = (GetMeta and GetMeta(ADDON, "Title")) or "Grey Gold"
 ns.ICON = "Interface\\Icons\\INV_Misc_Coin_02"
 
+ns.TAB_SETTINGS = 6
+
 ns.GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local GetItemIcon = (C_Item and C_Item.GetItemIconByID) or GetItemIcon
 local GetItemName = C_Item and C_Item.GetItemNameByID
@@ -16,6 +18,7 @@ local GetCoinText = (C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString) or 
 local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:0:0:2:0|t"
 
 local POOR       = (Enum and Enum.ItemQuality and Enum.ItemQuality.Poor) or 0
+ns.POOR          = POOR
 ns.FIRST_BAG     = BACKPACK_CONTAINER or 0
 ns.LAST_BAG      = NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
 local BATCH_SIZE = 12   -- sale requests sent per pass
@@ -29,6 +32,20 @@ local MAX_TRIES  = 3    -- then give up on that slot (e.g. a vendor that refuses
 ----------------------------------------------------------------------------
 function ns.Print(msg)
     print("|cff33ff99" .. ns.TITLE .. "|r: " .. msg)
+end
+
+-- WoW Forever hides some unit and loot values from addons ("secret values").
+-- Plain() turns those into nil so they can be compared and stored safely.
+function ns.Plain(v)
+    if type(issecretvalue) == "function" and issecretvalue(v) then return nil end
+    return v
+end
+
+-- Zone the player is in right now, or nil if the game won't say.
+function ns.Zone()
+    local z = ns.Plain((GetRealZoneText and GetRealZoneText()) or GetZoneText())
+    if type(z) ~= "string" or z == "" then return nil end
+    return z
 end
 
 -- Coin-icon money string. trimCopper drops the copper once there is gold.
@@ -77,7 +94,8 @@ function ns.PlayerKey()
     return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
 end
 
--- Tiny callback list. kinds: "init", "login", "data", "settings".
+-- Tiny callback list. kinds: "init", "login", "data", "settings",
+-- "bags" (the junk in the bags changed).
 local callbacks = {}
 function ns.RegisterCallback(fn) callbacks[#callbacks + 1] = fn end
 function ns.Notify(kind)
@@ -90,9 +108,12 @@ end
 local function InitDB()
     local db = GreyGoldDB or {}
     GreyGoldDB = db
+    local oldVersion = db.version or 0
     if db.enabled == nil then db.enabled = true end
     if db.summary == nil then db.summary = true end
     if db.milestones == nil then db.milestones = true end
+    if db.suggest == nil then db.suggest = true end
+    if db.bagLabel == nil then db.bagLabel = true end
     db.milestone = db.milestone or 0
     db.minimap = db.minimap or {}
     db.minimap.angle = db.minimap.angle or 200
@@ -102,7 +123,10 @@ local function InitDB()
     db.neverSell = db.neverSell or {}
     db.names = db.names or {}
     db.chars = db.chars or {}
-    db.version = 2
+    db.carry = db.carry or {}  -- [Name-Realm] = where the junk in that character's bags came from
+    -- 2.1.0 added the Log tab before Settings, so Settings moved from tab 5 to 6.
+    if oldVersion > 0 and oldVersion < 3 and db.ui.tab == 5 then db.ui.tab = ns.TAB_SETTINGS end
+    db.version = 3
     ns.db = db
 end
 
@@ -135,10 +159,16 @@ end
 ----------------------------------------------------------------------------
 local merchantOpen = false
 local running = false
+local tallyPending = false  -- vendor closed mid-run; the last sales are still being counted
 local ticker
 local passes = 0
 local pending = {}  -- [bag*1000+slot] = { bag, slot, itemID, count, value, name }
-local haulZone
+
+ns.vendorZone = nil  -- zone of the vendor that is (or was last) open
+ns.visit = 0         -- goes up once per vendor window, so a visit is only counted once
+
+-- True while auto-sell is busy, so hand sales and bag bookkeeping wait for it.
+function ns.IsSelling() return running or tallyPending end
 
 -- Same rule the default UI uses to show the coin icon, minus protected items.
 local function IsJunk(info)
@@ -175,13 +205,15 @@ local function Tally(batch)
             items, value = items + p.count, value + p.value
         end
     end
-    if #sales == 0 then return end
-
-    local reached = ns.RecordHaul(sales, haulZone)
-    if ns.db.summary then
-        ns.Print(format("sold %s junk item%s for %s.", ns.Num(items), items == 1 and "" or "s", ns.Money(value)))
+    if #sales > 0 then
+        local reached = ns.RecordHaul(sales, ns.vendorZone, { visit = ns.visit })
+        if ns.db.summary then
+            ns.Print(format("sold %s junk item%s for %s.", ns.Num(items), items == 1 and "" or "s", ns.Money(value)))
+        end
+        if ns.db.milestones and #reached > 0 then ns.AnnounceMilestone(reached[#reached]) end
     end
-    if ns.db.milestones and #reached > 0 then ns.AnnounceMilestone(reached[#reached]) end
+    -- Lets Sources.lua tell these sales apart from hand sales and catch up on the bags.
+    if ns.AfterTally then ns.AfterTally(sales) end
 end
 
 local function Finish()
@@ -193,7 +225,11 @@ local function Finish()
         Tally(batch)
     else
         -- Vendor closed mid-run: give in-flight sales a moment to land.
-        C_Timer.After(0.5, function() Tally(batch) end)
+        tallyPending = true
+        C_Timer.After(0.5, function()
+            tallyPending = false
+            Tally(batch)
+        end)
     end
 end
 
@@ -256,7 +292,8 @@ frame:SetScript("OnEvent", function(self, event, arg1)
         ns.Notify("login")
     elseif event == "MERCHANT_SHOW" then
         merchantOpen = true
-        haulZone = (GetRealZoneText and GetRealZoneText()) or GetZoneText()
+        ns.visit = ns.visit + 1
+        ns.vendorZone = ns.Zone()
         if ns.db.enabled and not IsShiftKeyDown() then Start() end
     elseif event == "MERCHANT_CLOSED" then
         merchantOpen = false  -- stops selling so nothing gets "used" instead
@@ -305,7 +342,7 @@ SlashCmdList.GREYGOLD = function(msg)
             ns.Print("usage: /greygold keep <shift-click an item>")
         end
     elseif cmd == "settings" or cmd == "options" or cmd == "config" then
-        ns.ShowWindow(5)
+        ns.ShowWindow(ns.TAB_SETTINGS)
     else
         Help()
     end

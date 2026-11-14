@@ -1,4 +1,4 @@
--- Grey Gold: the five tabs of the stats window, plus the small entry in
+-- Grey Gold: the six tabs of the stats window, plus the small entry in
 -- Esc > Options > AddOns. Each panel is built the first time it is shown.
 
 local _, ns = ...
@@ -19,6 +19,18 @@ local function ItemLabel(e)
     if ns.db.neverSell[e.id] then s = s .. " |cff40ff40(kept)|r" end
     return s
 end
+
+-- Date filter shared by the Items and Zones tabs. dbKey remembers the choice.
+local RANGES = { "Today", "This week", "30 days", "All time" }
+local function NewRangeToggle(p, dbKey)
+    local t = UI.NewToggle(p, RANGES, function(i)
+        ns.db.ui[dbKey] = i
+        p:Refresh()
+    end, 66)
+    return t
+end
+
+local function RangeChoice(dbKey) return ns.db.ui[dbKey] or #RANGES end
 
 local function ItemTooltipExtra(tt, e, canToggle)
     tt:AddLine(" ")
@@ -56,15 +68,42 @@ UI.builders[1] = function(parent)
         p.tiles[i] = t
     end
 
+    -- Progress to the next junk milestone (account-wide, like the announcements).
+    local mb = CreateFrame("Frame", nil, p)
+    mb:SetSize(W, 16)
+    mb:SetPoint("TOPLEFT", 0, -68)
+    local mbBg = mb:CreateTexture(nil, "BACKGROUND")
+    mbBg:SetAllPoints()
+    mbBg:SetColorTexture(0, 0, 0, 0.45)
+    mb.fill = mb:CreateTexture(nil, "BORDER")
+    mb.fill:SetPoint("TOPLEFT")
+    mb.fill:SetPoint("BOTTOMLEFT")
+    mb.fill:SetColorTexture(0.78, 0.58, 0.14, 0.75)
+    mb.text = UI.Text(mb, "GameFontHighlightSmall", nil, "CENTER")
+    mb.text:SetPoint("CENTER", 0, 0)
+    mb:EnableMouse(true)
+    mb:SetScript("OnEnter", function(self)
+        local goal, left = ns.MilestoneProgress()
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine("Junk milestones", 1, 0.82, 0)
+        GameTooltip:AddDoubleLine("Lifetime junk gold", ns.Money(ns.LifetimeCopper()), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Next milestone", ns.Money(goal * 10000), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Still to go", ns.Money(left), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddLine("Every grey item you sell counts, by hand or automatically, on all your characters.", 0.6, 0.6, 0.6, true)
+        GameTooltip:Show()
+    end)
+    mb:SetScript("OnLeave", UI.HideTooltip)
+    p.milestone = mb
+
     local title = UI.Header(p, "Gold per day", W - 150)
-    title:SetPoint("TOPLEFT", 2, -76)
+    title:SetPoint("TOPLEFT", 2, -94)
     p.range = UI.NewToggle(p, { "14 days", "30 days" }, function(i)
         ns.db.ui.overviewRange = i
         p:Refresh()
     end, 64)
-    p.range:SetPoint("TOPRIGHT", p, "TOPRIGHT", -66, -72)
-    p.chart = UI.NewChart(p, W, 136)
-    p.chart:SetPoint("TOPLEFT", 0, -96)
+    p.range:SetPoint("TOPRIGHT", p, "TOPRIGHT", -66, -90)
+    p.chart = UI.NewChart(p, W, 118)
+    p.chart:SetPoint("TOPLEFT", 0, -114)
 
     local rh = UI.Header(p, "Records", W)
     rh:SetPoint("TOPLEFT", 2, -244)
@@ -101,6 +140,11 @@ UI.builders[1] = function(parent)
         local t = ns.Totals(scope)
         local tiles = { t.today, t.week, t.month, t.all }
         for i, v in ipairs(tiles) do self.tiles[i]:Set(ns.Money(v.c, true), Plural(v.n, "item")) end
+
+        local goal, left, frac = ns.MilestoneProgress()
+        self.milestone.fill:SetWidth(math.max(1, W * math.min(1, math.max(0, frac))))
+        self.milestone.text:SetText(format("Next milestone |cffffd100%s|r:  %s to go",
+            ns.Money(goal * 10000), ns.Money(left, true)))
 
         local range = ns.db.ui.overviewRange or 1
         self.range:Select(range)
@@ -300,7 +344,7 @@ UI.builders[2] = function(parent)
 end
 
 ----------------------------------------------------------------------------
--- 3. Items: all-time leaderboard
+-- 3. Items: leaderboard for a date range (all time by default)
 ----------------------------------------------------------------------------
 UI.builders[3] = function(parent)
     local p = UI.NewPanel(parent)
@@ -312,8 +356,11 @@ UI.builders[3] = function(parent)
     search:HookScript("OnTextChanged", function() p:Refresh() end)
     p.search = search
 
+    p.range = NewRangeToggle(p, "itemRange")
+    p.range:SetPoint("TOPLEFT", W - 272, -2)
+
     p.info = UI.Text(p, "GameFontHighlightSmall", nil, "RIGHT")
-    p.info:SetPoint("TOPRIGHT", -4, -6)
+    p.info:SetPoint("BOTTOMRIGHT", -4, 2)
 
     p.list = UI.NewList(p, W, H - 50, {
         { title = "Item", width = 250, sort = "name", defaultAsc = true, icon = true, fmt = ItemLabel },
@@ -332,11 +379,15 @@ UI.builders[3] = function(parent)
     p.list:SetPoint("TOPLEFT", 0, -28)
 
     local hint = UI.Text(p, "GameFontDisableSmall",
-        "Click a column to sort  " .. DIM .. "|||r  Shift-click to link in chat  " .. DIM .. "|||r  Right-click to protect from selling", "LEFT")
+        "Shift-click to link  " .. DIM .. "|||r  Right-click to protect", "LEFT")
     hint:SetPoint("BOTTOMLEFT", 4, 2)
 
     function p:Refresh()
-        local all = ns.ItemTable(Scope())
+        local range = RangeChoice("itemRange")
+        self.range:Select(range)
+        self.list.empty:SetText(range == #RANGES and "No junk sold yet. Your leaderboard will fill up here."
+            or "No junk sold in this period.")
+        local all = ns.ItemTable(Scope(), ns.RangeFor(range))
         local q = strlower(strtrim(self.search:GetText() or ""))
         local list = all
         if q ~= "" then
@@ -356,24 +407,52 @@ UI.builders[3] = function(parent)
 end
 
 ----------------------------------------------------------------------------
--- 4. Zones: where you sold your junk (zone you were in at the vendor)
+-- 4. Zones: where you farmed your junk (looted) or sold it (at the vendor)
 ----------------------------------------------------------------------------
 UI.builders[4] = function(parent)
     local p = UI.NewPanel(parent)
 
-    local h = UI.Header(p, "Where you sold your junk", W - 220)
-    h:SetPoint("TOPLEFT", 2, -4)
-    p.info = UI.Text(p, "GameFontHighlightSmall", nil, "RIGHT")
-    p.info:SetPoint("TOPRIGHT", -4, -5)
+    p.mode = UI.NewToggle(p, { "Farmed in", "Sold in" }, function(i)
+        ns.db.ui.zoneMode = i
+        p:Refresh()
+    end, 80)
+    p.mode:SetPoint("TOPLEFT", 0, -2)
+    p.range = NewRangeToggle(p, "zoneRange")
+    p.range:SetPoint("TOPLEFT", W - 272, -2)
 
-    p.list = UI.NewList(p, W, H - 30, {
+    p.info = UI.Text(p, "GameFontHighlightSmall", nil, "LEFT")
+    p.info:SetPoint("BOTTOMLEFT", 4, 2)
+    p.info:SetWidth(W - 8)
+    p.info:SetWordWrap(false)
+
+    local function Share(e) return floor(e.share * 100 + 0.5) .. "%" end
+
+    p.farm = UI.NewList(p, W, H - 50, {
+        { title = "Zone", width = 230, sort = "name", defaultAsc = true, fmt = function(e) return e.zone end },
+        { title = "Gold", width = 110, sort = "c", align = "RIGHT", fmt = function(e) return ns.Money(e.c, true) end },
+        { title = "Items", width = 60, sort = "n", align = "RIGHT", fmt = function(e) return ns.Num(e.n) end },
+        { title = "Per item", width = 90, sort = "per", align = "RIGHT", fmt = function(e) return ns.Money(e.per) end },
+        { title = "Share", width = 90, sort = "share", bar = true, align = "RIGHT", fmt = Share },
+    }, {
+        sortCol = 2,
+        emptyText = "No farm zones yet.\nJunk you loot from 2.1.0 on is credited to the zone you looted it in.",
+        tooltip = function(tt, e)
+            tt:AddLine(e.zone, 1, 0.82, 0)
+            tt:AddDoubleLine("Gold", ns.Money(e.c), 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine("Items", ns.Num(e.n), 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine("Average per item", ns.Money(e.per), 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine("Share of farmed junk gold", format("%.1f%%", e.share * 100), 1, 1, 1, 1, 1, 1)
+            tt:AddLine("Junk you looted here (mobs, chests, fishing, containers), counted when it was sold.", 0.6, 0.6, 0.6, true)
+        end,
+    })
+    p.farm:SetPoint("TOPLEFT", 0, -28)
+
+    p.sold = UI.NewList(p, W, H - 50, {
         { title = "Zone", width = 230, sort = "name", defaultAsc = true, fmt = function(e) return e.zone end },
         { title = "Gold", width = 110, sort = "c", align = "RIGHT", fmt = function(e) return ns.Money(e.c, true) end },
         { title = "Visits", width = 60, sort = "v", align = "RIGHT", fmt = function(e) return ns.Num(e.v) end },
         { title = "Per visit", width = 90, sort = "per", align = "RIGHT", fmt = function(e) return ns.Money(e.per, true) end },
-        { title = "Share", width = 90, sort = "share", bar = true, align = "RIGHT", fmt = function(e)
-            return floor(e.share * 100 + 0.5) .. "%"
-        end },
+        { title = "Share", width = 90, sort = "share", bar = true, align = "RIGHT", fmt = Share },
     }, {
         sortCol = 2,
         emptyText = "No zones yet. Sell some junk!",
@@ -383,13 +462,142 @@ UI.builders[4] = function(parent)
             tt:AddDoubleLine("Vendor visits", ns.Num(e.v), 1, 1, 1, 1, 1, 1)
             tt:AddDoubleLine("Average per visit", ns.Money(e.per), 1, 1, 1, 1, 1, 1)
             tt:AddDoubleLine("Share of all junk gold", format("%.1f%%", e.share * 100), 1, 1, 1, 1, 1, 1)
+            tt:AddLine("The zone you were in at the vendor.", 0.6, 0.6, 0.6, true)
         end,
     })
-    p.list:SetPoint("TOPLEFT", 0, -30)
+    p.sold:SetPoint("TOPLEFT", 0, -28)
 
     function p:Refresh()
-        local list, total = ns.ZoneTable(Scope())
-        self.info:SetText(format("%s  %s|||r  %s", Plural(#list, "zone"), DIM, ns.Money(total, true)))
+        local scope, mode, range = Scope(), ns.db.ui.zoneMode or 1, RangeChoice("zoneRange")
+        self.mode:Select(mode)
+        self.range:Select(range)
+        local from, to = ns.RangeFor(range)
+        local farm = mode == 1
+        self.farm:SetShown(farm)
+        self.sold:SetShown(not farm)
+        local list, total = ns.ZoneTable(scope, from, to, farm and "farm" or nil)
+        local text = format("%s  %s|||r  %s", Plural(#list, "zone"), DIM, ns.Money(total, true))
+        if farm then
+            local other = ns.UncreditedTotal(scope, from, to)
+            if other > 0 then
+                text = text .. format("  %s|||r  %s from mail, trade, bank or unknown origin (no zone credit)",
+                    DIM, ns.Money(other, true))
+            end
+            self.farm:SetData(list)
+        else
+            self.sold:SetData(list)
+        end
+        self.info:SetText(text)
+    end
+
+    return p
+end
+
+----------------------------------------------------------------------------
+-- 5. Log: every sale, with where and when the junk was found
+----------------------------------------------------------------------------
+local LOG_SHOWN = 500  -- rows built at most (the list has no virtual scrolling)
+
+local function LogSource(e)
+    if not e.row.k then return DIM .. e.src .. "|r" end
+    return e.src
+end
+
+local NOTE_COLOR = { ["Bought back"] = "|cffff9040", ["By hand"] = "|cffb0b0b0" }
+
+local function LogNoteText(e)
+    if e.note == "" then return "" end
+    return (NOTE_COLOR[e.note] or "|cff40c0ff") .. e.note .. "|r"
+end
+
+local function LogTooltip(tt, e)
+    local r = e.row
+    local Y, Wh = { 1, 0.82, 0 }, { 1, 1, 1 }
+    local function Line(label, value)
+        tt:AddDoubleLine(label, value, Y[1], Y[2], Y[3], Wh[1], Wh[2], Wh[3])
+    end
+    tt:AddLine(" ")
+    Line("Sold", ns.FormatStamp(r.t) .. (r.m and "  (by hand)" or ""))
+    Line("Sold in", r.z or "?")
+    Line("Quantity", ns.Num(r.n))
+    Line("Gold", ns.Money(r.c))
+    tt:AddLine(" ")
+    if not r.k then
+        Line("Came from", DIM .. "unknown|r")
+        tt:AddLine("It was already in your bags when tracking began (Grey Gold 2.1.0).", 0.6, 0.6, 0.6, true)
+    elseif ns.FARM_KINDS[r.k] then
+        Line("Looted from", e.src)
+        if r.lz then Line("Looted in", r.lz) end
+        if r.lt then Line("Looted", ns.FormatStamp(r.lt)) end
+    else
+        Line("Came from", e.src)
+        if r.lz then Line("Received in", r.lz) end
+        if r.lt then Line("Received", ns.FormatStamp(r.lt)) end
+        tt:AddLine("Not looted by you, so no farm-zone credit.", 0.6, 0.6, 0.6, true)
+    end
+    if r.rb and r.rb > 0 then
+        tt:AddLine(format("You bought it back and sold it again (%s).", Plural(r.rb, "time")), 0.25, 0.75, 1, true)
+    end
+    if r.bb then
+        tt:AddLine("Bought back " .. ns.FormatStamp(r.bb) .. ". Not counted in your totals.", 1, 0.56, 0.25, true)
+    end
+    if Scope() == "ALL" then Line("Character", ns.CharLabel(e.char)) end
+    tt:AddLine("Right-click to toggle never-sell", 0.6, 0.6, 0.6)
+end
+
+UI.builders[5] = function(parent)
+    local p = UI.NewPanel(parent)
+
+    local search = UI.TryCreate("EditBox", "GreyGoldLogSearch", p, { "SearchBoxTemplate", "InputBoxTemplate" })
+    search:SetSize(200, 20)
+    search:SetPoint("TOPLEFT", 6, -2)
+    search:SetAutoFocus(false)
+    search:HookScript("OnTextChanged", function() p:Refresh() end)
+    p.search = search
+
+    p.info = UI.Text(p, "GameFontHighlightSmall", nil, "RIGHT")
+    p.info:SetPoint("TOPRIGHT", -4, -6)
+
+    p.list = UI.NewList(p, W, H - 50, {
+        { title = "When", width = 104, sort = "t", fmt = function(e) return ns.FormatTime(e.t) end },
+        { title = "Item", width = 168, sort = "name", defaultAsc = true, icon = true, fmt = ItemLabel },
+        { title = "Qty", width = 34, sort = "n", align = "RIGHT", fmt = function(e) return ns.Num(e.n) end },
+        { title = "Gold", width = 72, sort = "c", align = "RIGHT", fmt = function(e)
+            local m = ns.Money(e.c)
+            return e.row.bb and (DIM .. m .. "|r") or m
+        end },
+        { title = "From", width = 144, sort = "src", defaultAsc = true, fmt = LogSource },
+        { title = "Note", width = 62, sort = "note", fmt = LogNoteText },
+    }, {
+        sortCol = 1,
+        emptyText = "No sales logged yet.\nThe log starts with Grey Gold 2.1.0: sell some junk and it shows up here.",
+        onClick = function(e, button)
+            if button == "RightButton" then ns.ToggleNeverSell(e.id) end
+        end,
+        tooltipExtra = LogTooltip,
+    })
+    p.list:SetPoint("TOPLEFT", 0, -28)
+
+    local hint = UI.Text(p, "GameFontDisableSmall",
+        "Search by item or source  " .. DIM .. "|||r  Hover a row for details  " .. DIM .. "|||r  Shift-click to link  "
+        .. DIM .. "|||r  Right-click to protect", "LEFT")
+    hint:SetPoint("BOTTOMLEFT", 4, 2)
+
+    function p:Refresh()
+        local q = strlower(strtrim(self.search:GetText() or ""))
+        local list = {}
+        local copper = 0
+        for _, e in ipairs(ns.LogEntries(Scope())) do
+            if q == "" or strlower(e.name):find(q, 1, true) or strlower(e.src):find(q, 1, true) then
+                list[#list + 1] = e
+                if not e.row.bb then copper = copper + e.c end
+            end
+        end
+        local total = #list
+        for i = LOG_SHOWN + 1, total do list[i] = nil end  -- newest first, so the oldest go
+        local shown = total > LOG_SHOWN and format("Showing newest %s of %s", ns.Num(LOG_SHOWN), Plural(total, "sale"))
+            or Plural(total, "sale")
+        self.info:SetText(format("%s  %s|||r  %s", shown, DIM, ns.Money(copper, true)))
         self.list:SetData(list)
     end
 
@@ -397,7 +605,7 @@ UI.builders[4] = function(parent)
 end
 
 ----------------------------------------------------------------------------
--- 5. Settings: options, never-sell list, about, reset
+-- 6. Settings: options, never-sell list, about, reset
 ----------------------------------------------------------------------------
 StaticPopupDialogs["GREYGOLD_RESET"] = {
     text = "Delete all " .. ns.TITLE .. " history for %s?\n\nThis cannot be undone.",
@@ -443,7 +651,7 @@ local ABOUT = table.concat({
     DIM .. "/junk works as a shortcut for /greygold.|r",
 }, "\n")
 
-UI.builders[5] = function(parent)
+UI.builders[ns.TAB_SETTINGS] = function(parent)
     local p = UI.NewPanel(parent)
     local lw = 290
 
@@ -462,14 +670,20 @@ UI.builders[5] = function(parent)
         UI.NewCheck(p, "Show minimap button",
             "Drag it around the minimap edge to move it. You can always open this window with /greygold (or /junk).",
             function() return not ns.db.minimap.hide end, function(v) ns.SetMinimapShown(v) end),
+        UI.NewCheck(p, "Suggest junk to delete when bags are full",
+            "When your bags fill up, a chat line names your cheapest junk stack so you can make room. Nothing is ever deleted for you.",
+            function() return ns.db.suggest end, function(v) ns.db.suggest = v end),
+        UI.NewCheck(p, "Show junk value on the default backpack",
+            "A small label next to the default backpack shows the junk in your bags. Bag addons like Bagnon can show the same thing in their data bar instead (pick \"Grey Gold\" there).",
+            function() return ns.db.bagLabel end, function(v) ns.db.bagLabel = v; ns.Notify("bags") end),
     }
     for i, cb in ipairs(p.checks) do cb:SetPoint("TOPLEFT", 0, -22 - (i - 1) * 28) end
 
     local h2 = UI.Header(p, "Never sell", lw)
-    h2:SetPoint("TOPLEFT", 2, -146)
+    h2:SetPoint("TOPLEFT", 2, -202)
     local slot = CreateFrame("Button", nil, p)
     slot:SetSize(36, 36)
-    slot:SetPoint("TOPLEFT", 2, -168)
+    slot:SetPoint("TOPLEFT", 2, -224)
     local slotTex = slot:CreateTexture(nil, "BACKGROUND")
     slotTex:SetAllPoints()
     slotTex:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
@@ -491,7 +705,7 @@ UI.builders[5] = function(parent)
     hint:SetPoint("TOPLEFT", slot, "TOPRIGHT", 8, 0)
     hint:SetWidth(lw - 48)
 
-    p.keep = UI.NewList(p, lw, H - 212, {
+    p.keep = UI.NewList(p, lw, H - 268, {
         { title = "Protected items", width = lw - 28, sort = "name", defaultAsc = true, icon = true,
           fmt = function(e) return GREY .. e.name .. "|r" end },
     }, {
@@ -502,7 +716,7 @@ UI.builders[5] = function(parent)
         end,
         tooltipExtra = function(tt) tt:AddLine("Right-click to remove", 0.6, 0.6, 0.6) end,
     })
-    p.keep:SetPoint("TOPLEFT", 0, -212)
+    p.keep:SetPoint("TOPLEFT", 0, -268)
 
     local rx, rw = lw + 24, W - lw - 24
     local h3 = UI.Header(p, "About", rw)
@@ -558,7 +772,7 @@ ns.RegisterCallback(function(kind)
     open:SetText("Open " .. ns.TITLE)
     open:SetScript("OnClick", function()
         if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
-        ns.ShowWindow(5)
+        ns.ShowWindow(ns.TAB_SETTINGS)
     end)
 
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
