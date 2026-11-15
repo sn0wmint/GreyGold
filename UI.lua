@@ -157,11 +157,7 @@ local BASE_H = 1  -- baseline thickness; bars stand on top of it
 local function BarEnter(self)
     local s = self.data
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    if s.kind == "week" then
-        GameTooltip:AddLine(ns.FormatWeek(s.key) .. " - " .. ns.FormatShort(s.to), GOLD_R, GOLD_G, GOLD_B)
-    else
-        GameTooltip:AddLine(ns.FormatDay(s.key, true), GOLD_R, GOLD_G, GOLD_B)
-    end
+    GameTooltip:AddLine(ns.FormatPeriod(s.kind, s.key), GOLD_R, GOLD_G, GOLD_B)
     GameTooltip:AddDoubleLine("Gold", ns.Money(s.c), 1, 1, 1, 1, 1, 1)
     GameTooltip:AddDoubleLine("Items sold", ns.Num(s.n), 1, 1, 1, 1, 1, 1)
     if self.chart.onClick then GameTooltip:AddLine("Click for details", 0.6, 0.6, 0.6) end
@@ -444,6 +440,46 @@ function UI.NewList(parent, w, h, columns, opts)
 end
 
 ----------------------------------------------------------------------------
+-- Card list: a scrolling column of tall rows, each drawn by the caller.
+-- build(card) creates a row's widgets once; paint(card, item) fills them in.
+----------------------------------------------------------------------------
+function UI.NewCardList(parent, w, h, rowH, build, paint)
+    listCount = listCount + 1
+    local L = CreateFrame("Frame", nil, parent)
+    L:SetSize(w, h)
+    L.cards, L.innerW = {}, w - 24
+
+    local sf = CreateFrame("ScrollFrame", "GreyGoldList" .. listCount, L, "UIPanelScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT", 0, 0)
+    sf:SetPoint("BOTTOMRIGHT", -24, 0)
+    sf.scrollBarHideable = true
+    local content = CreateFrame("Frame", nil, sf)
+    content:SetSize(L.innerW, 1)
+    sf:SetScrollChild(content)
+    L.scroll, L.content = sf, content
+
+    function L:SetData(data)
+        for i, item in ipairs(data) do
+            local card = self.cards[i]
+            if not card then
+                card = CreateFrame("Frame", nil, content)
+                card:SetSize(self.innerW, rowH - 4)
+                card:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
+                build(card)
+                self.cards[i] = card
+            end
+            card.item = item
+            paint(card, item)
+            card:Show()
+        end
+        for i = #data + 1, #self.cards do self.cards[i]:Hide() end
+        content:SetHeight(math.max(1, #data * rowH))
+    end
+
+    return L
+end
+
+----------------------------------------------------------------------------
 -- Main window
 ----------------------------------------------------------------------------
 local function SavePosition(f)
@@ -605,9 +641,10 @@ function UI.Refresh()
 
     local panel = panels[db.ui.tab]
     if panel and panel:IsShown() and panel.Refresh then panel:Refresh() end
+    if UI.achievements and UI.achievements:IsShown() then UI.achievements:Refresh() end
 end
 
--- Jump from a chart/record to a specific day or week in History.
+-- Jump from a chart/record to a specific day, week, month or year in History.
 function UI.OpenHistory(kind, key)
     UI.focus = { kind = kind, key = key }
     ns.ShowWindow(2)
@@ -623,6 +660,14 @@ function ns.ToggleWindow(tab)
     if UI.frame and UI.frame:IsShown() then UI.frame:Hide() else ns.ShowWindow(tab) end
 end
 
+-- Redraw once per frame, however many sales were recorded in it.
+local refreshQueued = false
 ns.RegisterCallback(function(kind)
-    if kind == "data" or kind == "settings" then UI.Refresh() end
+    if (kind == "data" or kind == "settings") and not refreshQueued then
+        refreshQueued = true
+        C_Timer.After(0, function()
+            refreshQueued = false
+            UI.Refresh()
+        end)
+    end
 end)

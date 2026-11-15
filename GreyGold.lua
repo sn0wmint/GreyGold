@@ -124,10 +124,17 @@ local function InitDB()
     db.names = db.names or {}
     db.chars = db.chars or {}
     db.carry = db.carry or {}  -- [Name-Realm] = where the junk in that character's bags came from
+    db.achieved = db.achieved or {}  -- [achievement id] = { t = time reached, c = Name-Realm }
     -- 2.1.0 added the Log tab before Settings, so Settings moved from tab 5 to 6.
     if oldVersion > 0 and oldVersion < 3 and db.ui.tab == 5 then db.ui.tab = ns.TAB_SETTINGS end
-    db.version = 3
     ns.db = db
+    -- 2.2.0 changed the milestone steps: re-count the level against the new steps
+    -- and mark ones already passed as reached, without announcing them.
+    if oldVersion > 0 and oldVersion < 4 then
+        ns.SyncMilestone()
+        ns.upgradeAchievements = true
+    end
+    db.version = 4
 end
 
 function ns.SetEnabled(on)
@@ -188,21 +195,6 @@ ns.IsJunk = IsJunk
 
 local function SellPrice(info)
     return select(11, ns.GetItemInfo(info.hyperlink or info.itemID)) or 0
-end
-
--- Junk currently in the bags: item count and total vendor value.
-function ns.ScanBags()
-    local n, c = 0, 0
-    for bag = ns.FIRST_BAG, ns.LAST_BAG do
-        for slot = 1, C_Container.GetContainerNumSlots(bag) do
-            local info = C_Container.GetContainerItemInfo(bag, slot)
-            if IsJunk(info) then
-                local count = info.stackCount or 1
-                n, c = n + count, c + SellPrice(info) * count
-            end
-        end
-    end
-    return n, c
 end
 
 -- Only count sales the server confirmed (the item is gone from its slot).

@@ -3,6 +3,23 @@
 Not planned for a release yet. Recorded so they don't get lost. This file is
 left out of release zips (see `.gitattributes`).
 
+## More achievement categories
+
+The Achievements window (2.2.0) has one category, Gold. New ones are added by
+registering entries in `Achievements.lua` (`ns.RegisterAchievement`), each with a
+`progress` function; storage and the window need no changes. Ideas, all based on
+data the sales log already records (from 2.1.0 on):
+
+- **Zones:** sell junk farmed in a zone (e.g. 1g from Elwynn Forest).
+- **Regions:** junk farmed in 10 different zones, or in every zone of a continent.
+  Needs the continent recorded at loot time (the game can report it).
+- **Items:** sell 100 of one grey item, or 50 different grey items.
+- **Mobs:** junk from 25 kinds of mob, or 100 junk items from one mob type.
+- **Sources:** first fishing junk, junk from 10 chests, junk from a dungeon.
+- **Habits:** a 7-day selling streak, a 1g vendor visit, a full bag sold at once.
+
+Names use the game's own zones, mobs and items (see the lore guideline below).
+
 ## Zone collection journal
 
 Each zone gets a collection page listing the grey items that actually drop

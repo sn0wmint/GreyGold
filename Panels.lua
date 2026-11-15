@@ -69,8 +69,9 @@ UI.builders[1] = function(parent)
     end
 
     -- Progress to the next junk milestone (account-wide, like the announcements).
+    local BAR_W = W - 112  -- room for the Achievements button at its right end
     local mb = CreateFrame("Frame", nil, p)
-    mb:SetSize(W, 16)
+    mb:SetSize(BAR_W, 16)
     mb:SetPoint("TOPLEFT", 0, -68)
     local mbBg = mb:CreateTexture(nil, "BACKGROUND")
     mbBg:SetAllPoints()
@@ -87,13 +88,22 @@ UI.builders[1] = function(parent)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine("Junk milestones", 1, 0.82, 0)
         GameTooltip:AddDoubleLine("Lifetime junk gold", ns.Money(ns.LifetimeCopper()), 1, 1, 1, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Next milestone", ns.Money(goal * 10000), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine("Next milestone", ns.Money(goal), 1, 1, 1, 1, 1, 1)
         GameTooltip:AddDoubleLine("Still to go", ns.Money(left), 1, 1, 1, 1, 1, 1)
         GameTooltip:AddLine("Every grey item you sell counts, by hand or automatically, on all your characters.", 0.6, 0.6, 0.6, true)
         GameTooltip:Show()
     end)
     mb:SetScript("OnLeave", UI.HideTooltip)
     p.milestone = mb
+
+    local ach = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+    ach:SetSize(106, 18)
+    ach:SetPoint("LEFT", mb, "RIGHT", 6, 0)
+    ach:SetText("Achievements")
+    ach:SetScript("OnClick", function()
+        UI.Sound("U_CHAT_SCROLL_BUTTON")
+        UI.ToggleAchievements()
+    end)
 
     local title = UI.Header(p, "Gold per day", W - 150)
     title:SetPoint("TOPLEFT", 2, -94)
@@ -142,9 +152,9 @@ UI.builders[1] = function(parent)
         for i, v in ipairs(tiles) do self.tiles[i]:Set(ns.Money(v.c, true), Plural(v.n, "item")) end
 
         local goal, left, frac = ns.MilestoneProgress()
-        self.milestone.fill:SetWidth(math.max(1, W * math.min(1, math.max(0, frac))))
+        self.milestone.fill:SetWidth(math.max(1, BAR_W * math.min(1, math.max(0, frac))))
         self.milestone.text:SetText(format("Next milestone |cffffd100%s|r:  %s to go",
-            ns.Money(goal * 10000), ns.Money(left, true)))
+            ns.Money(goal), ns.Money(left, true)))
 
         local range = ns.db.ui.overviewRange or 1
         self.range:Select(range)
@@ -171,6 +181,11 @@ UI.builders[1] = function(parent)
                 tt:AddDoubleLine("Gold", ns.Money(bw.c), 1, 1, 1, 1, 1, 1)
                 tt:AddDoubleLine("Items", ns.Num(bw.n), 1, 1, 1, 1, 1, 1)
                 tt:AddDoubleLine("Days with sales", bw.active, 1, 1, 1, 1, 1, 1)
+                if r.bestMonth then
+                    tt:AddLine(" ")
+                    tt:AddDoubleLine("Best month", ns.FormatMonth(r.bestMonth.key) .. "  " .. ns.Money(r.bestMonth.c, true),
+                        1, 0.82, 0, 1, 1, 1)
+                end
                 tt:AddLine("Click to open that week", 0.6, 0.6, 0.6)
             end,
             bw and function() UI.OpenHistory("week", bw.key) end)
@@ -221,15 +236,18 @@ end
 ----------------------------------------------------------------------------
 -- 2. History: daily / weekly periods with a per-item breakdown
 ----------------------------------------------------------------------------
+local HISTORY_KINDS = { "day", "week", "month", "year" }
+local HISTORY_BARS = { 30, 12, 12, 5 }  -- bars in the chart for each mode
+
 UI.builders[2] = function(parent)
     local p = UI.NewPanel(parent)
     p.kind = "day"
 
-    p.mode = UI.NewToggle(p, { "Daily", "Weekly" }, function(i)
-        p.kind = (i == 2) and "week" or "day"
+    p.mode = UI.NewToggle(p, { "Daily", "Weekly", "Monthly", "Yearly" }, function(i)
+        p.kind = HISTORY_KINDS[i]
         p.selected = nil
         p:Refresh()
-    end, 70)
+    end, 62)
     p.mode:SetPoint("TOPLEFT", 0, 0)
     p.info = UI.Text(p, "GameFontDisableSmall", nil, "RIGHT")
     p.info:SetPoint("TOPRIGHT", -4, -5)
@@ -240,7 +258,10 @@ UI.builders[2] = function(parent)
     local leftW = 236
     p.periods = UI.NewList(p, leftW, H - 146, {
         { title = "Date", width = 96, sort = "key", fmt = function(e)
-            return e.kind == "week" and ("Wk " .. ns.FormatShort(e.key)) or ns.FormatDay(e.key)
+            if e.kind == "week" then return "Wk " .. ns.FormatShort(e.key) end
+            if e.kind == "month" then return ns.FormatMonth(e.key) end
+            if e.kind == "year" then return e.key:sub(1, 4) end
+            return ns.FormatDay(e.key)
         end },
         { title = "Items", width = 38, sort = "n", align = "RIGHT", fmt = function(e) return ns.Num(e.n) end },
         { title = "Gold", width = 74, sort = "c", align = "RIGHT", fmt = function(e) return ns.Money(e.c, true) end },
@@ -253,10 +274,11 @@ UI.builders[2] = function(parent)
             p:Refresh()
         end,
         tooltip = function(tt, e)
-            tt:AddLine(e.kind == "week" and (ns.FormatWeek(e.key) .. " - " .. ns.FormatShort(e.to)) or ns.FormatDay(e.key, true), 1, 0.82, 0)
+            tt:AddLine(ns.FormatPeriod(e.kind, e.key), 1, 0.82, 0)
             tt:AddDoubleLine("Gold", ns.Money(e.c), 1, 1, 1, 1, 1, 1)
             tt:AddDoubleLine("Items", ns.Num(e.n), 1, 1, 1, 1, 1, 1)
             tt:AddDoubleLine("Vendor visits", ns.Num(e.v), 1, 1, 1, 1, 1, 1)
+            if e.kind ~= "day" then tt:AddDoubleLine("Days with sales", ns.Num(e.active), 1, 1, 1, 1, 1, 1) end
         end,
     })
     p.periods:SetPoint("TOPLEFT", 0, -146)
@@ -296,13 +318,14 @@ UI.builders[2] = function(parent)
             self.kind, self.selected = UI.focus.kind, UI.focus.key
             UI.focus = nil
         end
-        local week = self.kind == "week"
-        self.mode:Select(week and 2 or 1)
+        local kind, mode = self.kind, 1
+        for i, k in ipairs(HISTORY_KINDS) do if k == kind then mode = i end end
+        self.mode:Select(mode)
 
-        local periods = ns.Periods(scope, self.kind)
+        local periods = ns.Periods(scope, kind)
         if not self.selected and periods[1] then self.selected = periods[1].key end
-        self.info:SetText(Plural(#periods, week and "week" or "day") .. " with sales")
-        self.chart:SetData(ns.Series(scope, self.kind, week and 12 or 30), function(s)
+        self.info:SetText(Plural(#periods, kind) .. " with sales")
+        self.chart:SetData(ns.Series(scope, kind, HISTORY_BARS[mode]), function(s)
             self.selected = s.key
             self:Refresh()
         end, self.selected)
@@ -316,17 +339,17 @@ UI.builders[2] = function(parent)
             self.items:SetData({}, true)
             return
         end
-        local to = week and ns.AddDays(from, 6) or from
+        local _, to = ns.PeriodBounds(kind, from)
         local sel
         for _, e in ipairs(periods) do
             if e.key == from then sel = e; break end
         end
 
-        self.title:SetText(week and (ns.FormatWeek(from) .. " - " .. ns.FormatShort(to)) or ns.FormatDay(from, true))
+        self.title:SetText(ns.FormatPeriod(kind, from))
         if sel then
             local bar = "  " .. DIM .. "|||r  "
             local text = ns.Money(sel.c) .. bar .. Plural(sel.n, "item") .. bar .. Plural(sel.v, "visit")
-            if week then text = text .. bar .. ns.Money(sel.c / sel.length, true) .. " / day" end
+            if kind ~= "day" then text = text .. bar .. ns.Money(sel.c / sel.length, true) .. " / day" end
             self.summary:SetText(text)
         else
             self.summary:SetText(DIM .. "Nothing sold.|r")
@@ -412,7 +435,7 @@ end
 UI.builders[4] = function(parent)
     local p = UI.NewPanel(parent)
 
-    p.mode = UI.NewToggle(p, { "Farmed in", "Sold in" }, function(i)
+    p.mode = UI.NewToggle(p, { "Farmed in", "Sold in", "Dropped by" }, function(i)
         ns.db.ui.zoneMode = i
         p:Refresh()
     end, 80)
@@ -467,6 +490,26 @@ UI.builders[4] = function(parent)
     })
     p.sold:SetPoint("TOPLEFT", 0, -28)
 
+    p.drops = UI.NewList(p, W, H - 50, {
+        { title = "Dropped by", width = 230, sort = "name", defaultAsc = true, fmt = function(e) return e.name end },
+        { title = "Gold", width = 110, sort = "c", align = "RIGHT", fmt = function(e) return ns.Money(e.c, true) end },
+        { title = "Items", width = 60, sort = "n", align = "RIGHT", fmt = function(e) return ns.Num(e.n) end },
+        { title = "Per item", width = 90, sort = "per", align = "RIGHT", fmt = function(e) return ns.Money(e.per) end },
+        { title = "Share", width = 90, sort = "share", bar = true, align = "RIGHT", fmt = Share },
+    }, {
+        sortCol = 2,
+        emptyText = "Nothing here yet.\nJunk you loot and sell from 2.2.0 on is counted for the mob, chest or catch it came from.",
+        tooltip = function(tt, e)
+            tt:AddLine(e.name, 1, 0.82, 0)
+            tt:AddDoubleLine("Gold", ns.Money(e.c), 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine("Junk items", ns.Num(e.n), 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine("Average per item", ns.Money(e.per), 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine("Share of looted junk gold", format("%.1f%%", e.share * 100), 1, 1, 1, 1, 1, 1)
+            tt:AddLine("Counted when the junk was sold. These totals are kept per month, forever.", 0.6, 0.6, 0.6, true)
+        end,
+    })
+    p.drops:SetPoint("TOPLEFT", 0, -28)
+
     function p:Refresh()
         local scope, mode, range = Scope(), ns.db.ui.zoneMode or 1, RangeChoice("zoneRange")
         self.mode:Select(mode)
@@ -474,7 +517,20 @@ UI.builders[4] = function(parent)
         local from, to = ns.RangeFor(range)
         local farm = mode == 1
         self.farm:SetShown(farm)
-        self.sold:SetShown(not farm)
+        self.sold:SetShown(mode == 2)
+        self.drops:SetShown(mode == 3)
+        if mode == 3 then
+            local list, total = ns.SourceTable(scope, from, to)
+            local text = format("%s  %s|||r  %s", Plural(#list, "source"), DIM, ns.Money(total, true))
+            if range == 1 or range == 2 then
+                text = text .. "  " .. DIM .. "|||r  counted per month: showing this whole month"
+            elseif range == 3 then
+                text = text .. "  " .. DIM .. "|||r  counted per month: showing this month and last"
+            end
+            self.drops:SetData(list)
+            self.info:SetText(text)
+            return
+        end
         local list, total = ns.ZoneTable(scope, from, to, farm and "farm" or nil)
         local text = format("%s  %s|||r  %s", Plural(#list, "zone"), DIM, ns.Money(total, true))
         if farm then
@@ -664,8 +720,8 @@ UI.builders[ns.TAB_SETTINGS] = function(parent)
         UI.NewCheck(p, "Chat summary after selling",
             "Print how many items were sold and for how much.",
             function() return ns.db.summary end, function(v) ns.db.summary = v; ns.Notify("settings") end),
-        UI.NewCheck(p, "Milestone celebrations",
-            "Announce (with a coin sound) when your lifetime junk gold passes 10g, 25g, 50g, 100g and beyond.",
+        UI.NewCheck(p, "Achievement announcements",
+            "Announce (with a coin sound) each junk milestone: 10s, 50s, 1g, 2g, 5g and on up to 200g, then every 100g. See them all with the Achievements button on the Overview.",
             function() return ns.db.milestones end, function(v) ns.db.milestones = v end),
         UI.NewCheck(p, "Show minimap button",
             "Drag it around the minimap edge to move it. You can always open this window with /greygold (or /junk).",
@@ -751,6 +807,221 @@ UI.builders[ns.TAB_SETTINGS] = function(parent)
     end
 
     return p
+end
+
+----------------------------------------------------------------------------
+-- Achievements window (opened from the Overview), docked to the main window
+----------------------------------------------------------------------------
+local PARCHMENT = "Interface\\AchievementFrame\\UI-Achievement-Parchment-Horizontal"
+
+local function AchStatus(e)
+    if e.reached then
+        return e.t and ns.FormatStamp(e.t) or "Reached"
+    elseif e.isNext then
+        return ns.Money(math.max(0, e.goal - e.current), true) .. " to go"
+    end
+    return "Not yet"
+end
+
+local function AchTooltip(card)
+    local e = card.item
+    if not e then return end
+    GameTooltip:SetOwner(card, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(e.name, 1, 0.82, 0)
+    if e.flavor then GameTooltip:AddLine("\"" .. e.flavor .. "\"", 0.9, 0.8, 0.6, true) end
+    if e.desc then GameTooltip:AddLine(e.desc, 1, 1, 1, true) end
+    GameTooltip:AddLine(" ")
+    if e.reached then
+        GameTooltip:AddDoubleLine("Reached", e.t and ns.FormatStamp(e.t) or "before version 2.2.0", 1, 0.82, 0, 1, 1, 1)
+        if e.who then GameTooltip:AddDoubleLine("By", ns.CharLabel(e.who), 1, 0.82, 0, 1, 1, 1) end
+    elseif e.category == "Gold" then
+        GameTooltip:AddDoubleLine("Progress", ns.Money(e.current, true) .. " of " .. ns.Money(e.goal), 1, 0.82, 0, 1, 1, 1)
+    else
+        GameTooltip:AddDoubleLine("Progress", ns.Num(e.current) .. " of " .. ns.Num(e.goal), 1, 0.82, 0, 1, 1, 1)
+    end
+    GameTooltip:Show()
+end
+
+-- One achievement card: parchment, icon, name, status line, check mark, progress strip.
+local function BuildAchCard(card)
+    local w = card:GetWidth()
+    local bg = card:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.1, 0.08, 0.06, 0.9)  -- stays visible if the parchment art is missing
+    card.paper = card:CreateTexture(nil, "BORDER")
+    card.paper:SetPoint("TOPLEFT", 1, -1)
+    card.paper:SetPoint("BOTTOMRIGHT", -1, 1)
+    card.paper:SetTexture(PARCHMENT)
+    card.paper:SetTexCoord(0, 1, 0, 0.3)
+
+    for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT", true }, { "BOTTOMLEFT", "BOTTOMRIGHT", true } }) do
+        local line = card:CreateTexture(nil, "ARTWORK")
+        line:SetColorTexture(0.55, 0.45, 0.25, 0.9)
+        line:SetHeight(1)
+        line:SetPoint(edge[1]); line:SetPoint(edge[2])
+    end
+
+    card.icon = card:CreateTexture(nil, "ARTWORK")
+    card.icon:SetSize(30, 30)
+    card.icon:SetPoint("LEFT", 6, 0)
+    card.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+
+    card.name = UI.Text(card, "GameFontNormal", nil, "LEFT")
+    card.name:SetPoint("TOPLEFT", 44, -6)
+    card.name:SetWidth(w - 44 - 28 - 78)
+    card.name:SetWordWrap(false)
+    card.amount = UI.Text(card, "GameFontHighlightSmall", nil, "RIGHT")  -- "10g" beside the title
+    card.amount:SetPoint("TOPRIGHT", -30, -8)
+    card.amount:SetWidth(76)
+    card.amount:SetWordWrap(false)
+    card.status = UI.Text(card, "GameFontHighlightSmall", nil, "LEFT")
+    card.status:SetPoint("BOTTOMLEFT", 44, 8)
+    card.status:SetWidth(w - 44 - 28)
+    card.status:SetWordWrap(false)
+
+    card.check = card:CreateTexture(nil, "OVERLAY")
+    card.check:SetSize(20, 20)
+    card.check:SetPoint("RIGHT", -6, 0)
+    card.check:SetTexture("Interface\\RaidFrame\\ReadyCheck-Ready")
+
+    card.barBg = card:CreateTexture(nil, "ARTWORK")
+    card.barBg:SetColorTexture(0, 0, 0, 0.6)
+    card.barBg:SetHeight(3)
+    card.barBg:SetPoint("BOTTOMLEFT", 44, 3)
+    card.barBg:SetWidth(w - 44 - 28)
+    card.bar = card:CreateTexture(nil, "OVERLAY")
+    card.bar:SetColorTexture(1, 0.82, 0.1, 1)
+    card.bar:SetHeight(3)
+    card.bar:SetPoint("BOTTOMLEFT", card.barBg, "BOTTOMLEFT")
+    card.barMax = w - 44 - 28
+
+    card:EnableMouse(true)
+    card:SetScript("OnEnter", AchTooltip)
+    card:SetScript("OnLeave", UI.HideTooltip)
+end
+
+local function PaintAchCard(card, e)
+    card.icon:SetTexture(e.icon or ns.ICON)
+    card.name:SetText(e.name)
+    card.amount:SetText(e.amount or "")
+    card.amount:SetAlpha(e.reached and 1 or 0.6)
+    card.status:SetText(AchStatus(e))
+    card.check:SetShown(e.reached)
+    card.icon:SetDesaturated(not e.reached)
+    card.paper:SetDesaturated(not e.reached)
+    if e.reached then
+        card.paper:SetVertexColor(0.62, 0.5, 0.36)   -- warm, darkened so light text stays readable
+        card.icon:SetVertexColor(1, 1, 1)
+        card.name:SetTextColor(1, 0.82, 0)
+        card.status:SetTextColor(1, 1, 1)
+    elseif e.isNext then
+        card.paper:SetVertexColor(0.34, 0.34, 0.34)
+        card.icon:SetVertexColor(0.8, 0.8, 0.8)
+        card.name:SetTextColor(0.9, 0.9, 0.9)
+        card.status:SetTextColor(0.78, 0.63, 0.31)
+    else
+        card.paper:SetVertexColor(0.2, 0.2, 0.2)
+        card.icon:SetVertexColor(0.5, 0.5, 0.5)
+        card.name:SetTextColor(0.55, 0.55, 0.55)
+        card.status:SetTextColor(0.45, 0.45, 0.45)
+    end
+    -- The next one shows how far along you are; the status text moves up to make room.
+    local showBar = e.isNext and e.goal > 0
+    card.barBg:SetShown(showBar)
+    card.bar:SetShown(showBar)
+    if showBar then
+        card.bar:SetWidth(math.max(1, card.barMax * math.min(1, e.current / e.goal)))
+    end
+    card.status:ClearAllPoints()
+    card.status:SetPoint("BOTTOMLEFT", 44, showBar and 10 or 8)
+end
+
+local function BuildAchievements()
+    local f = UI.frame
+    local w, template = UI.TryCreate("Frame", "GreyGoldAchievementsFrame", f, { "BasicFrameTemplateWithInset" })
+    w:SetSize(330, 420)
+    w:SetPoint("TOPLEFT", f, "TOPRIGHT", 2, -18)
+    w:EnableMouse(true)
+    if template then
+        if w.SetTitle then
+            w:SetTitle("Achievements")
+        else
+            local title = w.TitleText or (w.TitleContainer and w.TitleContainer.TitleText)
+            if title then title:SetText("Achievements") end
+        end
+    else
+        -- This client has no such template: draw a plain framed box with its own title and close button.
+        local box = UI.Box(w, 330, 420)
+        box:SetAllPoints()
+        box:SetFrameLevel(w:GetFrameLevel())
+        local title = UI.Text(w, "GameFontNormal", "Achievements")
+        title:SetPoint("TOP", 0, -8)
+        local close = UI.TryCreate("Button", nil, w, { "UIPanelCloseButton" })
+        close:SetSize(24, 24)
+        close:SetPoint("TOPRIGHT", -2, -2)
+        close:SetScript("OnClick", function() w:Hide() end)
+    end
+
+    -- Summary: "6 of 15" over a gold progress bar.
+    w.count = UI.Text(w, "GameFontNormal", nil, "LEFT")
+    w.count:SetPoint("TOPLEFT", 14, -34)
+    w.total = UI.Text(w, "GameFontHighlightSmall", nil, "RIGHT")
+    w.total:SetPoint("TOPRIGHT", -16, -36)
+    local barBg = w:CreateTexture(nil, "ARTWORK")
+    barBg:SetColorTexture(0, 0, 0, 0.6)
+    barBg:SetSize(300, 8)
+    barBg:SetPoint("TOPLEFT", 14, -54)
+    w.bar = w:CreateTexture(nil, "OVERLAY")
+    w.bar:SetColorTexture(0.85, 0.65, 0.13, 1)
+    w.bar:SetHeight(8)
+    w.bar:SetPoint("TOPLEFT", barBg, "TOPLEFT")
+
+    -- Category buttons only when there is more than one category to switch between.
+    local cats = ns.AchievementCategories()
+    w.category = cats[1]
+    local top = -70
+    if #cats > 1 then
+        w.tabs = UI.NewToggle(w, cats, function(i)
+            w.category = cats[i]
+            w:Refresh()
+        end, 70)
+        w.tabs:SetPoint("TOPLEFT", 12, -68)
+        top = -94
+    end
+
+    w.list = UI.NewCardList(w, 310, 420 + top - 12, 48, BuildAchCard, PaintAchCard)
+    w.list:SetPoint("TOPLEFT", 12, top)
+
+    function w:Refresh()
+        local rows, reached = ns.AchievementList(self.category)
+        for _, e in ipairs(rows) do
+            if not e.reached then e.isNext = true; break end
+        end
+        if self.tabs then
+            for i, c in ipairs(cats) do
+                if c == self.category then self.tabs:Select(i) end
+            end
+        end
+        self.count:SetText(format("%s of %s reached", ns.Num(reached), ns.Num(#rows)))
+        self.total:SetText("Lifetime junk gold: " .. ns.Money(ns.LifetimeCopper(), true))
+        self.bar:SetWidth(math.max(1, 300 * (#rows > 0 and reached / #rows or 0)))
+        self.list:SetData(rows)
+    end
+
+    w:Hide()
+    UI.achievements = w
+    return w
+end
+
+function UI.ToggleAchievements()
+    if not UI.frame then return end
+    local w = UI.achievements or BuildAchievements()
+    if w:IsShown() then
+        w:Hide()
+    else
+        w:Show()
+        w:Refresh()
+    end
 end
 
 ----------------------------------------------------------------------------

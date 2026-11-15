@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Grey Gold
 ## Notes: Sells every grey item at any vendor and tracks the gold you earn.
-## Version: 2.1.0
+## Version: 2.2.0
 ## SavedVariables: GreyGoldDB
 ## OptionalDeps: BagBrother
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
@@ -12,6 +12,7 @@
 GreyGold.lua
 Stats.lua
 Sources.lua
+Achievements.lua
 Minimap.lua
 Broker.lua
 UI.lua
