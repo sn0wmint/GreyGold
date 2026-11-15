@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: Grey Gold
-## Notes: Sells every grey item at any vendor and tracks the gold you earn.
+## Notes: Sells your grey junk at any vendor and shows which mobs and zones your gold came from.
 ## Version: 2.2.0
 ## SavedVariables: GreyGoldDB
 ## OptionalDeps: BagBrother

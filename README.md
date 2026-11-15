@@ -9,7 +9,7 @@
 Open any vendor and your junk is gone, sold in a second, with nothing to click. Then comes the fun part: Grey Gold remembers which mob dropped each item, which zone you farmed it in and when you sold it. After a few weeks you can see that the Defias in Westfall paid for your first mount, or that fishing in Stormwind was never worth it.
 
 <p align="center">
-  <img src="media/grey-gold-1-overview.png" width="600" alt="Grey Gold stats window, Overview tab: gold earned today, this week, this month and all time, a gold-per-day chart, and records">
+  <img src="media/grey-gold-1-overview.png" width="800" alt="Grey Gold stats window, Overview tab: gold earned today, this week, this month and all time, progress to the next milestone, a gold-per-day chart and records, with the Achievements window open beside it">
 </p>
 
 ## What you get
@@ -21,11 +21,22 @@ Open any vendor and your junk is gone, sold in a second, with nothing to click. 
 - Sold something by mistake? Buy it back from the vendor as usual. Grey Gold notices and takes the sale out of your totals.
 - Grey items you sell by hand count too, so your numbers are right however you play.
 
+<p align="center">
+  <img src="media/grey-gold-10-chat.png" width="643" alt="Chat: Grey Gold sold 6 junk items for 10 silver 9 copper the moment the vendor opened">
+</p>
+
 ### See where your gold comes from
 - **Which mobs pay best.** A "Dropped by" list ranks every mob, chest and fishing catch by the junk gold it gave you.
 - **Which zones are worth farming.** "Farmed in" shows the gold from junk you looted in each zone. "Sold in" shows where you cashed it in.
 - **A log of every sale.** Date and time, item, gold, and where it came from: "3 Broken Fangs, looted from Kobold Miner in Elwynn Forest, sold in Stormwind at 14:32". Search it by item or by mob.
 - **Your best junk.** A leaderboard of every grey item you've sold, for today, this week, the last 30 days or all time.
+
+<p align="center">
+  <img src="media/grey-gold-2-log.png" width="600" alt="Log tab: every sale with time, item, quantity, gold and the mob it came from">
+</p>
+<p align="center">
+  <img src="media/grey-gold-3-dropped-by.png" width="600" alt="Zones tab, Dropped by view: mobs ranked by the junk gold they gave you">
+</p>
 
 ### A history that lasts for years
 - Browse your income by **day, week, month or year**, each with a chart and the items sold in that period.
@@ -34,13 +45,18 @@ Open any vendor and your junk is gone, sold in a second, with nothing to click. 
 - View all your characters together, or one at a time.
 
 ### Achievements
-- Milestones from your first **10 silver** up to **200 gold** and beyond, each announced with a coin sound.
-- The **Achievements** window shows every milestone, the date and time you reached it, and how far you are from the next one.
+- Fifteen milestones from your first **10 silver** up to **200 gold**, then one every 100 gold. Each has its own title: you start at **Pocket Change**, pass **Trash Baron** at 45 gold, and end up a **Grey Gold Magnate**.
+- Each one is announced in chat with a coin sound (you can turn that off).
+- The **Achievements** window shows every milestone, the date and time you reached it, which character got there, and how far you are from the next one.
 
 ### Always know what's in your bags
-- **Works with Bagnon.** Grey Gold can show "Junk: 12 (3g 40s)" in the data bar at the bottom of Bagnon's bag window. Other addons that show data feeds can display it too.
+- **Works with Bagnon.** Grey Gold shows how many junk items you carry and what they're worth in the data bar at the bottom of Bagnon's bag window, next to a gold coin: "6 (10s 9c)". Other addons that show data feeds can display it too.
 - Using the default bags? A small junk label sits next to your backpack.
 - When your bags fill up, a chat line names your cheapest junk stack, so you know what to throw away. Grey Gold never deletes anything itself.
+
+<p align="center">
+  <img src="media/grey-gold-9-bagnon.png" width="507" alt="Bagnon bag window: the Grey Gold coin in the data bar at the bottom shows 6 junk items worth 10 silver 9 copper">
+</p>
 
 ## Installation
 
@@ -128,21 +144,25 @@ The **Showing** dropdown switches between **All characters** and any single char
 <details>
 <summary><b>Screenshots</b> (click to open)</summary>
 
-**History**
+**Zones: Farmed in.** Where you looted the junk you sold.
 
-<img src="media/grey-gold-2-history.png" width="600" alt="History tab: chart with the selected period highlighted, and the items sold in it">
+<img src="media/grey-gold-4-farmed-in.png" width="600" alt="Zones tab, Farmed in view: gold, items and share for each zone you looted junk in">
 
-**Items**
+**History.** Daily, weekly, monthly or yearly, with every item sold in the chosen period.
 
-<img src="media/grey-gold-3-items.png" width="600" alt="Items tab: sortable list of every junk item sold, with totals and price each">
+<img src="media/grey-gold-5-history.png" width="600" alt="History tab: daily chart, the list of days, and the items sold on the selected day">
 
-**Zones**
+**Items.** Your junk leaderboard, filtered by date.
 
-<img src="media/grey-gold-4-zones.png" width="600" alt="Zones tab: gold and share for each zone">
+<img src="media/grey-gold-6-items.png" width="600" alt="Items tab: sortable list of every junk item sold, with totals, price each and when it was last sold">
 
-**Settings**
+**Zones: Sold in.** Where you cashed it in, and how much each vendor visit was worth.
 
-<img src="media/grey-gold-5-settings.png" width="600" alt="Settings tab: options, never-sell slot and the list of slash commands">
+<img src="media/grey-gold-7-sold-in.png" width="600" alt="Zones tab, Sold in view: gold, vendor visits and gold per visit for each zone">
+
+**Settings.** Options, the never-sell list and the commands.
+
+<img src="media/grey-gold-8-settings.png" width="600" alt="Settings tab: options, never-sell slot and the list of slash commands">
 
 </details>
 
@@ -176,6 +196,8 @@ Junk you looted yourself: from mobs, chests, fishing and containers. Junk that c
 
 **How far back does the history go?**
 Your daily totals, farm zones and monthly mob totals are kept for as long as you keep the addon's saved data: years. The detailed Log keeps your last 5,000 sales per character and shows the newest 500 at a time; search to find older ones.
+
+Each kind of record starts with the version that introduced it. Daily totals go back to your first sale. Farm zones and the Log start with 2.1.0, and the "Dropped by" mob totals with 2.2.0.
 
 **How do I show my junk in Bagnon?**
 Open your bags. Bagnon has a data bar at the bottom of the window; click its **<** or **>** arrows until **Grey Gold** appears. Grey Gold itself works the same with or without a bag addon.
@@ -231,7 +253,7 @@ To help me fix a bug quickly, please include:
 ## Changelog
 
 ### 2.2.0
-- **Achievements:** new milestone steps that start at 10 silver (10s, 50s, 1g, 2g, 5g, 6.7g, 10g, 15g, 20g, 30g, 45g, 50g, 80g, 140g, 200g, then every 100g), and an Achievements window showing when you reached each one.
+- **Achievements:** new milestone steps that start at 10 silver (10s, 50s, 1g, 2g, 5g, 6.7g, 10g, 15g, 20g, 30g, 45g, 50g, 80g, 140g, 200g, then every 100g), each with its own title, and an Achievements window showing when you reached each one.
 - **History by month and year**, next to daily and weekly, plus a "best month" record.
 - **Dropped by:** a new view on the Zones tab ranking mobs, chests and catches by the junk gold they gave you. These totals are kept per month, forever.
 - The sales log now keeps 5,000 sales per character (was 2,000).
