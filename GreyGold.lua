@@ -170,13 +170,18 @@ local tallyPending = false  -- vendor closed mid-run; the last sales are still b
 local halted = false        -- run is winding down: nothing new is sent, in-flight sales finish
 local ticker
 local passes = 0
-local pending = {}  -- [bag*1000+slot] = { bag, slot, itemID, count, value, name }
+local pending = {}  -- [bag*1000+slot] = { bag, slot, itemID, count, price, value, name }
+local startCounts = {}  -- [itemID] = how many were in the bags when the run started
+local runVisit, runZone -- the vendor visit the run belongs to
+local tallying = false  -- a finished run is being counted
+local unpriced = false  -- the last pass skipped junk whose price the game hasn't loaded
+local lateTally         -- counts a run whose vendor closed mid-way (see Finish)
 
 ns.vendorZone = nil  -- zone of the vendor that is (or was last) open
 ns.visit = 0         -- goes up once per vendor window, so a visit is only counted once
 
 -- True while auto-sell is busy, so hand sales and bag bookkeeping wait for it.
-function ns.IsSelling() return running or tallyPending end
+function ns.IsSelling() return running or tallyPending or tallying end
 
 -- The player bought something back while auto-sell was running: stop sending
 -- sales, or the run would sell the bought-back item again straight away.
@@ -193,21 +198,65 @@ local function IsJunk(info)
 end
 ns.IsJunk = IsJunk
 
-local function SellPrice(info)
-    return select(11, ns.GetItemInfo(info.hyperlink or info.itemID)) or 0
+-- Vendor price of one, or nil while the game hasn't loaded the item's data yet.
+-- (Junk always has a price: items without one are never junk, see IsJunk.)
+ns.prices = {}
+function ns.SellPrice(id, link)
+    local p = ns.prices[id]
+    if p == nil then
+        p = select(11, ns.GetItemInfo(link or id))
+        if p then ns.prices[id] = p end
+    end
+    return p
 end
 
--- Only count sales the server confirmed (the item is gone from its slot).
-local function Tally(batch)
+-- [itemID] = how many of it are in the bags right now.
+local function BagCounts()
+    local counts = {}
+    for bag = ns.FIRST_BAG, ns.LAST_BAG do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info and info.itemID then
+                counts[info.itemID] = (counts[info.itemID] or 0) + (info.stackCount or 1)
+            end
+        end
+    end
+    return counts
+end
+
+-- Only count sales the server confirmed. A sale counts when its item has left
+-- the slot it was sold from AND the bags really hold that many fewer of it than
+-- when the run started. An item that merely moved to another slot (dragged, or
+-- sorted by a bag addon) is still in the bags, so it never counts as sold, and
+-- one that moved and then sold counts once.
+local function Tally(batch, counts, visit, zone)
+    tallying = true  -- a buyback the bag scan sees now still belongs to this run
+    local back = (ns.BeforeTally and ns.BeforeTally()) or {}  -- [itemID] = bought back during the run
+    tallying = false
+
+    local keys = {}
+    for key in pairs(batch) do keys[#keys + 1] = key end
+    sort(keys)
+    local now, gone = BagCounts(), {}
     local sales, items, value = {}, 0, 0
-    for _, p in pairs(batch) do
-        if C_Container.GetContainerItemID(p.bag, p.slot) ~= p.itemID then
-            sales[#sales + 1] = p
-            items, value = items + p.count, value + p.value
+    for _, key in ipairs(keys) do
+        local p = batch[key]
+        local id = p.itemID
+        if C_Container.GetContainerItemID(p.bag, p.slot) ~= id then
+            if not gone[id] then
+                gone[id] = math.max(0, (counts[id] or 0) - (now[id] or 0) + (back[id] or 0))
+            end
+            local take = math.min(p.count, gone[id])
+            if take > 0 then
+                gone[id] = gone[id] - take
+                p.count, p.value = take, p.price * take
+                sales[#sales + 1] = p
+                items, value = items + p.count, value + p.value
+            end
         end
     end
     if #sales > 0 then
-        local reached = ns.RecordHaul(sales, ns.vendorZone, { visit = ns.visit })
+        local reached = ns.RecordHaul(sales, zone, { visit = visit })
         if ns.db.summary then
             ns.Print(format("sold %s junk item%s for %s.", ns.Num(items), items == 1 and "" or "s", ns.Money(value)))
         end
@@ -220,17 +269,26 @@ end
 local function Finish()
     if ticker then ticker:Cancel() ticker = nil end
     running = false
-    local batch = pending
+    -- Everything the count needs belongs to this run, so a vendor opened again
+    -- before it is counted can't lend it its own visit, zone or bag snapshot.
+    local batch, counts, visit, zone = pending, startCounts, runVisit, runZone
     pending = {}
+    if unpriced then
+        unpriced = false
+        ns.Print("some junk was not sold because the game hasn't loaded its price yet. Type /greygold sell to try again.")
+    end
     if merchantOpen then
-        Tally(batch)
+        Tally(batch, counts, visit, zone)
     else
-        -- Vendor closed mid-run: give in-flight sales a moment to land.
-        tallyPending = true
-        C_Timer.After(0.5, function()
-            tallyPending = false
-            Tally(batch)
-        end)
+        -- Vendor closed mid-run: give in-flight sales a moment to land. Start()
+        -- counts it at once instead if a new run begins before then.
+        local function late()
+            if lateTally ~= late then return end  -- already counted
+            lateTally, tallyPending = nil, false
+            Tally(batch, counts, visit, zone)
+        end
+        lateTally, tallyPending = late, true
+        C_Timer.After(0.5, late)
     end
 end
 
@@ -239,7 +297,7 @@ local function Pass()
     if not merchantOpen or passes > MAX_PASSES then return Finish() end
 
     local now = GetTime()
-    local sent, waiting = 0, 0
+    local sent, waiting, noPrice = 0, 0, false
     for bag = ns.FIRST_BAG, ns.LAST_BAG do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local info = C_Container.GetContainerItemInfo(bag, slot)
@@ -247,16 +305,21 @@ local function Pass()
                 local key = bag * 1000 + slot
                 local p = pending[key]
                 if p and p.itemID ~= info.itemID then p = nil end
+                -- An unknown price is not a price of zero: wait for the game to
+                -- load it rather than sell the item and record nothing for it.
+                local price = p and p.price or ns.SellPrice(info.itemID, info.hyperlink)
                 if info.isLocked or (p and now - p.sentAt < RETRY_AFTER) or (sent >= BATCH_SIZE and not halted) then
                     waiting = waiting + 1  -- sale in flight, or next batch
                 elseif halted then
                     -- winding down: send nothing new
+                elseif not price then
+                    waiting, noPrice = waiting + 1, true  -- try again on the next pass
                 elseif not p or p.tries < MAX_TRIES then
                     if not p then
                         local count = info.stackCount or 1
                         p = {
                             bag = bag, slot = slot, itemID = info.itemID, count = count,
-                            value = SellPrice(info) * count, tries = 0,
+                            price = price, value = price * count, tries = 0,
                             name = info.hyperlink and info.hyperlink:match("%[(.-)%]"),
                         }
                         pending[key] = p
@@ -269,13 +332,19 @@ local function Pass()
         end
     end
 
+    unpriced = noPrice
     if sent == 0 and waiting == 0 then Finish() end
 end
 
 local function Start()
     if running or not merchantOpen then return end
-    running, passes, halted = true, 0, false
+    -- A run whose vendor closed a moment ago is counted first, from the bags as
+    -- they are now, so neither run can count the other's sales.
+    if lateTally then lateTally() end
+    running, passes, halted, unpriced = true, 0, false, false
     pending = {}
+    startCounts = BagCounts()
+    runVisit, runZone = ns.visit, ns.vendorZone
     ticker = C_Timer.NewTicker(INTERVAL, Pass)
     Pass()  -- first batch goes out immediately
 end

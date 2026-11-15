@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Grey Gold
-## Notes: Sells your grey junk at any vendor and shows which mobs and zones your gold came from.
-## Version: 2.2.0
+## Notes: Sells your grey junk at any vendor and shows which mobs and zones your junk gold came from.
+## Version: 2.2.1
 ## SavedVariables: GreyGoldDB
 ## OptionalDeps: BagBrother
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02

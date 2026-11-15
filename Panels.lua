@@ -522,10 +522,14 @@ UI.builders[4] = function(parent)
         if mode == 3 then
             local list, total = ns.SourceTable(scope, from, to)
             local text = format("%s  %s|||r  %s", Plural(#list, "source"), DIM, ns.Money(total, true))
-            if range == 1 or range == 2 then
-                text = text .. "  " .. DIM .. "|||r  counted per month: showing this whole month"
-            elseif range == 3 then
-                text = text .. "  " .. DIM .. "|||r  counted per month: showing this month and last"
+            if from then  -- name the months really shown: a week or 30 days can span two or three
+                local span = ns.FormatMonth(to)
+                if from:sub(1, 7) == to:sub(1, 7) then
+                    span = "all of " .. span
+                else
+                    span = ns.FormatMonth(from) .. " to " .. span
+                end
+                text = text .. "  " .. DIM .. "|||r  counted per month: showing " .. span
             end
             self.drops:SetData(list)
             self.info:SetText(text)

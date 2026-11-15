@@ -27,7 +27,7 @@ local MAX_NAMES      = 300  -- creature names remembered by GUID
 local carry            -- ns.db.carry[Name-Realm] = { items = { [itemID] = { entry, ... } }, session }
 local snap             -- [itemID] = grey items with a sell value in the bags at the last scan
 local otherSnap        -- [itemID] = every other item, only while a vendor is (or just was) open
-local prices = {}      -- [itemID] = vendor price of one
+local prices = ns.prices  -- [itemID] = vendor price of one (filled by ns.SellPrice)
 local names, nameCount = {}, 0
 local lastCast         -- { name, at }: the player's last spell target
 local loots = {}       -- recent loot windows, newest last
@@ -191,6 +191,36 @@ local function Fallback()
     return "mob"
 end
 
+local function Pack(...) return select("#", ...), { ... } end
+
+-- Who a loot slot came from: { { k, s, n }, ... }. With area loot one slot can
+-- hold copies from several corpses, and the game lists each with its quantity.
+-- n is nil when the game gives no quantity (that part then stands for all of it).
+local function SlotSources(slot)
+    local parts = {}
+    if GetLootSourceInfo then
+        local count, r = Pack(pcall(GetLootSourceInfo, slot))
+        if r[1] then
+            for i = 2, count, 2 do
+                local guid = Plain(r[i])
+                if type(guid) == "string" then
+                    local k, s = FromGUID(guid)
+                    if k then
+                        local n = Plain(r[i + 1])
+                        if type(n) ~= "number" or n < 1 then n = nil end
+                        parts[#parts + 1] = { k = k, s = s, n = n }
+                    end
+                end
+            end
+        end
+    end
+    if not parts[1] then
+        local k, s = Fallback()
+        parts[1] = { k = k, s = s }
+    end
+    return parts
+end
+
 local function OnLootWindow()
     if not carry or not GetNumLootItems then return end
     local okN, num = pcall(GetNumLootItems)
@@ -198,7 +228,7 @@ local function OnLootWindow()
     if type(num) ~= "number" then return end
     local ctx = loots[#loots]
     if not ctx or ctx.closedAt then  -- LOOT_READY and LOOT_OPENED both fire for one window
-        ctx = { items = {}, zone = ns.Zone(), t = time() }
+        ctx = { items = {}, seen = {}, zone = ns.Zone(), t = time() }
         loots[#loots + 1] = ctx
         if #loots > LOOT_KEEP then table.remove(loots, 1) end
     end
@@ -213,17 +243,18 @@ local function OnLootWindow()
             slotType = okT and Plain(slotType)
             if slotType == nil or slotType == 1 then ctx.unknown = true end  -- 1 = item
         end
-        if id and not ctx.items[id] then
-            local k, s
-            if GetLootSourceInfo then
-                local okS, guid = pcall(GetLootSourceInfo, slot)
-                guid = okS and Plain(guid)
-                if type(guid) == "string" then k, s = FromGUID(guid) end
+        if id and not ctx.seen[slot] then
+            ctx.seen[slot] = true
+            local parts = ctx.items[id]
+            if not parts then parts = {}; ctx.items[id] = parts end
+            for _, src in ipairs(SlotSources(slot)) do
+                local same
+                for _, part in ipairs(parts) do
+                    if part.k == src.k and part.s == src.s and part.n and src.n then same = part; break end
+                end
+                if same then same.n = same.n + src.n else parts[#parts + 1] = src end
+                ctx.first = ctx.first or src
             end
-            if not k then k, s = Fallback() end
-            local src = { k = k, s = s }
-            ctx.items[id] = src
-            ctx.first = ctx.first or src
         end
     end
 end
@@ -233,16 +264,37 @@ local function OnLootClosed()
     if ctx and not ctx.closedAt then ctx.closedAt = GetTime() end
 end
 
--- The recent loot window that held this item. With guess, also accept a recent
--- window that had items the game wouldn't name (they may include this one).
-local function LootSource(id, guess)
-    local now = GetTime()
+local function LootActive(ctx)
+    return not ctx.closedAt or GetTime() - ctx.closedAt < LOOT_WINDOW
+end
+
+-- Shares n new copies of an item out among the recent loot windows that held
+-- it, newest window first, each source getting no more than it offered.
+-- Returns the source entries and how many copies no window accounts for.
+local function TakeLoot(id, n)
+    local out = {}
     for i = #loots, 1, -1 do
         local ctx = loots[i]
-        if not ctx.closedAt or now - ctx.closedAt < LOOT_WINDOW then
-            if ctx.items[id] then return ctx, ctx.items[id] end
-            if guess and ctx.unknown then return ctx, ctx.first or { k = "mob" } end
+        local parts = LootActive(ctx) and ctx.items[id]
+        for _, part in ipairs(parts or {}) do
+            if n <= 0 then return out, 0 end
+            local take = part.n and math.min(part.n, n) or n
+            if take > 0 then
+                if part.n then part.n = part.n - take end
+                out[#out + 1] = { k = part.k, s = part.s, z = ctx.zone, t = ctx.t, n = take }
+                n = n - take
+            end
         end
+    end
+    return out, n
+end
+
+-- A recent loot window with items the game wouldn't name: they may include
+-- whatever just arrived.
+local function GuessLoot()
+    for i = #loots, 1, -1 do
+        local ctx = loots[i]
+        if LootActive(ctx) and ctx.unknown then return ctx, ctx.first or { k = "mob" } end
     end
 end
 
@@ -300,8 +352,12 @@ local function OnGain(id, n)
     end
     local window = (WindowActive("mail") and "mail") or (WindowActive("trade") and "trade")
         or (WindowActive("bank") and "bank")
-    local ctx, src = LootSource(id, false)
-    if not ctx and not window then ctx, src = LootSource(id, true) end
+    local looted, left = TakeLoot(id, n)
+    for _, part in ipairs(looted) do Push(id, part) end
+    if left <= 0 then return end
+    n = left  -- more arrived than the loot windows offered: not credited to their mobs
+    local ctx, src
+    if not window then ctx, src = GuessLoot() end
     local e
     if ctx then
         e = { k = src.k, s = src.s, z = ctx.zone, t = ctx.t }
@@ -448,12 +504,7 @@ end
 -- Bag scan
 ----------------------------------------------------------------------------
 local function SellPrice(id, link)
-    local p = prices[id]
-    if p == nil then
-        p = select(11, ns.GetItemInfo(link or id))
-        if p then prices[id] = p end
-    end
-    return p or 0
+    return ns.SellPrice(id, link) or 0
 end
 
 local function Suggest()
@@ -541,6 +592,17 @@ local function Scan(noSettle)
     end
     snap, otherSnap = grey, other
     if not noSettle then Settle() end
+end
+
+-- Called by the selling engine just before it counts an auto-sell run. Catches
+-- up on the bags and returns [itemID] = copies bought back during the run, so
+-- the count can tell "sold, then bought back" from "never sold".
+function ns.BeforeTally()
+    if not carry then return end
+    Scan(true)
+    local back = {}
+    for _, b in ipairs(deferred) do back[b.id] = (back[b.id] or 0) + b.n end
+    return back
 end
 
 -- Called by the selling engine once an auto-sell run has been counted.

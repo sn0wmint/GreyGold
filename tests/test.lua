@@ -714,5 +714,223 @@ for _, l in ipairs(GameTooltip.lines) do if l:find("junk in your bags") or l:fin
 check(junkLine, "minimap tooltip shows the junk readout without its own scan")
 check(ns.ScanBags == nil, "duplicate bag scan removed")
 
+-- "Dropped by" is kept per month: its footer names the months really shown.
+ns.db.ui.zoneMode = 3
+for range, want in pairs({ [1] = "showing all of " .. date("%B %Y"), [4] = false }) do
+    ns.db.ui.zoneRange = range
+    ns.ShowWindow(4)
+    sim.Advance(0.1)
+    local found = false
+    for _, f in ipairs(sim.Frames()) do
+        if f._shown and tostring(f._text):find("counted per month", 1, true) then
+            found = f._text:find(want or "\0", 1, true) and true or "other"
+        end
+    end
+    eq(found, want and true or false, "Dropped by footer for range " .. range)
+end
+
+----------------------------------------------------------------------------
+-- Scenarios from the November 2026 review
+----------------------------------------------------------------------------
+local realUse = C_Container.UseContainerItem
+local function Fresh()
+    GreyGoldDB = nil
+    sim.bags, sim.buyback, sim.units, sim.chat = {}, {}, {}, {}
+    sim.money, sim.shift, sim.mergeMoney, sim.moneyFirst = 0, false, false, false
+    sim.merchantOpen, sim.fishing, sim.cursor, sim.used = false, false, nil, 0
+    sim.zone = "Elwynn Forest"
+    C_Container.UseContainerItem = realUse
+    return sim.Load()
+end
+local function BySource(n, id)
+    local out = {}
+    for _, e in ipairs(Queue(n, id) or {}) do
+        local s = e.s or e.k or "none"
+        out[s] = (out[s] or 0) + e.n
+    end
+    return out
+end
+local function Hover(guid, name)
+    sim.units.mouseover = { guid = guid, name = name }
+    sim.Fire("UPDATE_MOUSEOVER_UNIT")
+end
+local WOLF, BOAR, BEAR = "Creature-0-1-0-1-111-0000AA", "Creature-0-1-0-1-222-0000BB", "Creature-0-1-0-1-333-0000CC"
+
+section("review: a refused sale whose item moved to another slot is not a sale")
+ns = Fresh()
+sim.Add(100, 1)
+sim.BagUpdate(); sim.Advance(0.5)
+C_Container.UseContainerItem = function() end  -- the vendor refuses it
+sim.OpenVendor()
+do
+    local slot = sim.SlotOf(100)
+    sim.bags[10], sim.bags[slot] = sim.bags[slot], nil
+end
+sim.BagUpdate(); sim.Advance(8)
+eq(sim.money, 0, "refused: no gold received")
+eq(sim.Count(100), 1, "refused: item still held")
+eq(ns.LifetimeCopper(), 0, "refused and moved: nothing recorded")
+eq(Char(ns) and #Rows(ns) or 0, 0, "refused and moved: no log row")
+check(not ChatHas("sold %d"), "refused and moved: no sale announced")
+sim.CloseVendor(); sim.Advance(4)
+eq(ns.LifetimeCopper(), 0, "refused and moved: still nothing after the vendor closes")
+C_Container.UseContainerItem = realUse
+
+section("review: an item that moved and then sold counts once")
+ns = Fresh()
+sim.Add(100, 3)
+sim.BagUpdate(); sim.Advance(0.5)
+sim.OpenVendor()  -- the sale of slot 1 is on its way...
+do
+    local slot = sim.SlotOf(100)
+    local stack = sim.bags[slot]
+    sim.bags[10], sim.bags[slot] = stack, nil  -- ...but the stack moves first
+    stack.locked = false
+end
+sim.BagUpdate(); sim.Advance(5)
+eq(sim.Count(100), 0, "moved: sold from its new slot")
+eq(sim.money, 15, "moved: paid once")
+eq(ns.LifetimeCopper(), 15, "moved then sold: recorded once")
+eq(Today(ns).items[100][1], 3, "moved then sold: 3 units, not 6")
+LogMatchesTotals(ns, "moved then sold")
+sim.CloseVendor(); sim.Advance(4)
+eq(ns.LifetimeCopper(), 15, "moved then sold: unchanged after the vendor closes")
+
+section("review: vendor closed mid-run and opened again at once")
+ns = Fresh()
+for i = 1, 15 do
+    sim.Item(4000 + i, "Scrap " .. i, 0, i)  -- 1c..15c: 12 go in the first batch
+    sim.Add(4000 + i, 1)
+end
+sim.BagUpdate(); sim.Advance(0.5)
+sim.OpenVendor()        -- first batch of 12 goes out
+sim.Advance(0.15)       -- ...and lands
+sim.CloseVendor()       -- closed before the second batch
+sim.zone = "Goldshire"
+sim.Advance(0.1)        -- the run notices and waits to be counted
+sim.OpenVendor()        -- another vendor, before that count
+sim.Advance(6)
+do
+    eq(sim.money, 120, "reopened: every item sold")
+    eq(ns.LifetimeCopper(), 120, "reopened: every sale counted once")
+    local elwynn, goldshire = Today(ns).zones["Elwynn Forest"], Today(ns).zones["Goldshire"]
+    eq(elwynn and elwynn[1], 78, "reopened: first run stays with its own visit (1c..12c)")
+    eq(goldshire and goldshire[1], 42, "reopened: second run in the new zone (13c..15c)")
+    local manual = 0
+    for _, r in ipairs(Rows(ns)) do if r.m then manual = manual + 1 end end
+    eq(manual, 0, "reopened: no auto-sale mistaken for a hand sale")
+end
+sim.CloseVendor(); sim.Advance(4)
+
+section("review: two stacks of one item, only one of them sells")
+ns = Fresh()
+sim.bags[1], sim.bags[2] = { id = 100, n = 2 }, { id = 100, n = 4 }
+sim.BagUpdate(); sim.Advance(0.5)
+C_Container.UseContainerItem = function(bag, slot) if slot == 1 then realUse(bag, slot) end end
+sim.OpenVendor(); sim.Advance(8)
+eq(sim.money, 10, "one of two stacks: paid for the stack of 2")
+eq(ns.LifetimeCopper(), 10, "one of two stacks: only the sold stack recorded")
+C_Container.UseContainerItem = realUse
+sim.CloseVendor(); sim.Advance(4)
+
+section("review: a price the game hasn't loaded yet is not a price of zero")
+ns = Fresh()
+do
+    local realInfo = ns.GetItemInfo
+    ns.GetItemInfo = function() return nil end
+    sim.Add(100, 2)
+    sim.BagUpdate(); sim.Advance(0.5)
+    C_Timer.After(0.4, function() ns.GetItemInfo = realInfo end)
+    sim.OpenVendor()
+    eq(sim.Count(100), 2, "unknown price: nothing sold while it is unknown")
+    sim.Advance(4)
+    eq(sim.money, 10, "price arrived: items sold")
+    eq(sim.Count(100), 0, "price arrived: bags empty")
+    eq(ns.LifetimeCopper(), 10, "price arrived: sale recorded at its real value")
+    LogMatchesTotals(ns, "late price")
+    sim.CloseVendor(); sim.Advance(4)
+
+    -- A price that never arrives: nothing is sold, nothing recorded, one notice.
+    ns = Fresh()
+    ns.GetItemInfo = function() return nil end
+    sim.Add(100, 2)
+    sim.BagUpdate(); sim.Advance(0.5)
+    sim.chat = {}
+    sim.OpenVendor(); sim.Advance(15)
+    eq(sim.Count(100), 2, "price never arrives: item kept")
+    eq(ns.LifetimeCopper(), 0, "price never arrives: nothing recorded")
+    local notices = 0
+    for _, line in ipairs(sim.chat) do if line:find("hasn't loaded its price") then notices = notices + 1 end end
+    eq(notices, 1, "price never arrives: said once")
+    sim.CloseVendor(); sim.Advance(1)
+    eq(sim.used, 0, "price never arrives: nothing used after the vendor closed")
+    sim.Advance(4)
+end
+
+section("review: the same item from two mobs keeps both sources")
+ns = Fresh()
+sim.LootCorpse(WOLF, "Wolf", { { 100, 1 } })
+sim.LootCorpse(BOAR, "Boar", { { 100, 1 } })  -- before the bag update of the first
+sim.Advance(0.5)
+do
+    local by = BySource(ns, 100)
+    eq(by.Wolf, 1, "two corpses, one bag update: Wolf")
+    eq(by.Boar, 1, "two corpses, one bag update: Boar")
+    eq(QueueSum(ns, 100), 2, "two corpses: two copies tracked")
+end
+
+ns = Fresh()
+sim.LootCorpse(WOLF, "Wolf", { { 100, 1 } })
+sim.LootCorpse(BOAR, "Boar", { { 100, 3 } })
+sim.LootCorpse(BEAR, "Bear", { { 100, 2 } })
+sim.Advance(0.5)
+do
+    local by = BySource(ns, 100)
+    check(by.Wolf == 1 and by.Boar == 3 and by.Bear == 2, "three corpses with different amounts keep their own")
+end
+
+section("review: area loot, one slot holding copies from several corpses")
+ns = Fresh()
+Hover(WOLF, "Wolf"); Hover(BOAR, "Boar")
+sim.LootCorpse(WOLF, "Wolf", { { 100, 3, sources = { { WOLF, 1 }, { BOAR, 2 } } }, { 101, 1 } }, false)
+sim.Advance(0.5)
+do
+    local by = BySource(ns, 100)
+    eq(by.Wolf, 1, "area loot: Wolf's copy")
+    eq(by.Boar, 2, "area loot: Boar's copies")
+    eq(BySource(ns, 101).Wolf, 1, "area loot: single-source slot")
+    sim.OpenVendor(); sim.Advance(3)
+    local sold = {}
+    for _, r in ipairs(Rows(ns, 100)) do sold[r.s or "none"] = (sold[r.s or "none"] or 0) + r.n end
+    check(sold.Wolf == 1 and sold.Boar == 2, "area loot: the sale is logged per mob")
+    eq(ns.LifetimeCopper(), 38, "area loot: 3 fangs and a pair of pants")
+    sim.CloseVendor(); sim.Advance(4)
+end
+
+section("review: loot left on the corpse gives no credit")
+ns = Fresh()
+sim.LootCorpse(WOLF, "Wolf", { { 100, 1 } })
+sim.Advance(0.5)
+do  -- the Boar's fang below is offered but not taken
+    Hover(BOAR, "Boar")
+    local held = sim.Count(100)
+    sim.LootCorpse(BOAR, "Boar", { { 100, 1 } }, false)
+    sim.bags[sim.SlotOf(100)].n = held  -- bags were full: it stayed on the corpse
+    sim.Advance(0.5)
+    local by = BySource(ns, 100)
+    check(by.Wolf == 1 and by.Boar == nil, "an untaken copy is not credited")
+end
+
+section("review: more arrives than the loot window offered")
+ns = Fresh()
+sim.LootCorpse(WOLF, "Wolf", { { 100, 1 } })
+sim.Add(100, 2)  -- two more from somewhere else, seen in the same bag update
+sim.Advance(0.5)
+do
+    local by = BySource(ns, 100)
+    eq(by.Wolf, 1, "extra copies: the Wolf gets only what it dropped")
+    eq(by.other, 2, "extra copies: the rest has no mob")
+end
+
 print(format("\n%d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)

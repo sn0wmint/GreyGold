@@ -13,6 +13,10 @@ installed:
 "<path to>/lua-language-server.exe" tests/test.lua "<path to this repo>"
 ```
 
+With a regular Lua install it is `lua tests/test.lua .` from the repo root.
+GitHub runs the same command on every push and pull request
+(`.github/workflows/test.yml`).
+
 The last line prints `N passed, 0 failed`. A failing check prints `FAIL:` with
 what it expected.
 

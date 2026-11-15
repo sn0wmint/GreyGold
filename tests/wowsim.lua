@@ -342,7 +342,15 @@ function issecretvalue(v) return v == SECRET end
 local loot
 function GetNumLootItems() return loot and #loot or 0 end
 function GetLootSlotLink(slot) local l = loot and loot[slot]; return l and Link(l.id) end
-function GetLootSourceInfo(slot) local l = loot and loot[slot]; if l then return l.guid, l.n end end
+-- One GUID and quantity per corpse the slot's copies came from (area loot: several).
+function GetLootSourceInfo(slot)
+    local l = loot and loot[slot]
+    if not l then return end
+    if not l.sources then return l.guid, l.n end
+    local out = {}
+    for _, s in ipairs(l.sources) do out[#out + 1] = s[1]; out[#out + 1] = s[2] end
+    return table.unpack(out)
+end
 sim.fishing = false
 function IsFishingLoot() return sim.fishing end
 
@@ -353,7 +361,10 @@ function sim.LootCorpse(guid, name, items, hover)
         sim.Fire("UPDATE_MOUSEOVER_UNIT")
     end
     loot = {}
-    for _, it in ipairs(items) do loot[#loot + 1] = { id = it[1], n = it[2], guid = it.guid or guid } end
+    -- it.sources = { { guid, n }, ... } makes one slot hold copies from several corpses.
+    for _, it in ipairs(items) do
+        loot[#loot + 1] = { id = it[1], n = it[2], guid = it.guid or guid, sources = it.sources }
+    end
     sim.Fire("LOOT_READY", true)
     sim.Fire("LOOT_OPENED", true)
     for _, l in ipairs(loot) do sim.Add(l.id, l.n) end

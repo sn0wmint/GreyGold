@@ -6,7 +6,9 @@
 
 **Your grey items are worth more than you think. Grey Gold sells them for you and shows you where every copper came from.**
 
-Open any vendor and your junk is gone, sold in a second, with nothing to click. Then comes the fun part: Grey Gold remembers which mob dropped each item, which zone you farmed it in and when you sold it. After a few weeks you can see that the Defias in Westfall paid for your first mount, or that fishing in Stormwind was never worth it.
+**[Get Grey Gold on CurseForge](https://www.curseforge.com/wow/addons/grey-gold)**
+
+Open any vendor and your junk is gone, sold in a second, with nothing to click. Then comes the fun part: Grey Gold remembers which mob dropped each item, which zone you farmed it in and when you sold it. After a few weeks you can see that the Defias in Westfall paid for your first mount, or that fishing in Stormwind barely earned you a silver.
 
 <p align="center">
   <img src="media/grey-gold-1-overview.png" width="800" alt="Grey Gold stats window, Overview tab: gold earned today, this week, this month and all time, progress to the next milestone, a gold-per-day chart and records, with the Achievements window open beside it">
@@ -17,8 +19,8 @@ Open any vendor and your junk is gone, sold in a second, with nothing to click. 
 ### Never click junk again
 - Every grey item with a sell value is sold the moment you open a vendor. These are the items that show the gold coin icon.
 - Hold **Shift** while opening the vendor to keep your junk that one time.
-- Put items you want to keep on the **never-sell list**. Grey transmog pieces are safe there forever.
-- Sold something by mistake? Buy it back from the vendor as usual. Grey Gold notices and takes the sale out of your totals.
+- Put items you want to keep on the **never-sell list**. Grey gear in your bags is junk too, so add grey transmog pieces before your first vendor visit; they are safe there forever.
+- Sold something by mistake? Buy it back from the vendor's **Buyback** tab as usual (the game keeps your last 12 sold stacks until you log out). Grey Gold notices and takes the sale out of your totals.
 - Grey items you sell by hand count too, so your numbers are right however you play.
 
 <p align="center">
@@ -26,8 +28,8 @@ Open any vendor and your junk is gone, sold in a second, with nothing to click. 
 </p>
 
 ### See where your gold comes from
-- **Which mobs pay best.** A "Dropped by" list ranks every mob, chest and fishing catch by the junk gold it gave you.
-- **Which zones are worth farming.** "Farmed in" shows the gold from junk you looted in each zone. "Sold in" shows where you cashed it in.
+- **Which mobs paid you most.** A "Dropped by" list ranks every mob, chest and fishing catch by the junk gold it gave you.
+- **Which zones your junk gold came from.** "Farmed in" shows the gold from junk you looted in each zone. "Sold in" shows where you cashed it in. These are totals of the junk you sold, counted when you sold it; they don't measure gold per hour or the rest of your loot.
 - **A log of every sale.** Date and time, item, gold, and where it came from: "3 Broken Fangs, looted from Kobold Miner in Elwynn Forest, sold in Stormwind at 14:32". Search it by item or by mob.
 - **Your best junk.** A leaderboard of every grey item you've sold, for today, this week, the last 30 days or all time.
 
@@ -71,7 +73,7 @@ Pick **one** of the two ways below. Option A is the easiest.
 
 ### Option B: install it yourself
 
-1. **Download the zip.** Get the latest file from the addon's CurseForge page (**Files** tab).
+1. **Download the zip.** Get the latest file from [Grey Gold's CurseForge page](https://www.curseforge.com/wow/addons/grey-gold) (**Files** tab).
 
 2. **Find your AddOns folder.** Open the Battle.net app, select **World of Warcraft**, choose **WoW Forever** as the version, click the **gear icon** next to the Play button, and choose **Show in Explorer** (Mac: **Show in Finder**). In the folder that opens, go to:
 
@@ -180,10 +182,10 @@ Drag it to move it around the minimap edge. The same actions are in the addon co
 ## FAQ
 
 **Will it sell anything that isn't grey?**
-No. Only grey (Poor quality) items that have a sell value are sold. Your gear, consumables and anything better than grey are never touched, and nothing better than grey is ever recorded in your stats.
+No. Only grey (Poor quality) items that have a sell value are sold. The gear you are wearing, and anything better than grey, is never touched, and nothing better than grey is ever recorded in your stats. Grey items in your bags are all sold, and that includes grey armour and weapons: put the ones you want to keep on the **Never sell** list first, or hold **Shift** while opening the vendor.
 
 **I sold something by mistake. Can I get it back?**
-Yes, if you act before logging out. Open the vendor's **Buyback** tab; the game keeps your last 12 sold items there. Grey Gold takes that sale back out of your totals and marks it **Bought back** in the Log. Add the item to your **Never sell** list afterwards, or the next vendor will sell it again.
+Usually, as long as the item is still on the vendor's **Buyback** tab. The game keeps only your last 12 sold stacks there and empties the list when you log out. If one visit sells more than 12 stacks of junk, the earliest ones are pushed off the list and can't be bought back. When you do buy an item back, Grey Gold takes that sale back out of your totals and marks it **Bought back** in the Log. Add the item to your **Never sell** list afterwards, or the next vendor will sell it again.
 
 **Do grey items I sell myself count?**
 Yes. They are recorded like any other sale and marked **By hand** in the Log. An item only counts once the vendor has paid for it, so destroying or equipping a grey item never counts as a sale.
@@ -235,15 +237,15 @@ Grey Gold is made for **WoW Forever**. Other game versions aren't supported.
 
 - **What counts as junk:** Poor quality, with a sell value, and not on your never-sell list. This is the rule the game uses for the coin icon.
 - **Selling:** sales go out in batches of 12 every 0.2 seconds, and failed ones are retried. Selling stops the moment the vendor window closes. If you buy something back while it is still selling, it stops so that item isn't sold again; `/greygold sell` sells the rest.
-- **Only real sales are recorded.** A sale counts when the server confirms it. A grey item you sell by hand counts once its payment arrives; items that leave your bags without a payment (destroyed, equipped, used) are not sales.
-- **Where junk came from:** when junk arrives in your bags, Grey Gold notes its origin: the mob, chest, catch or container you looted, or mail, trade, bank or "other". When you sell, the oldest copies are matched first, so a stack from three different mobs becomes three Log rows.
+- **Only real sales are recorded.** A sale counts when the server confirms it: the item has left its slot and your bags really hold fewer of it. An item that only moved to another slot is not a sale. If the game hasn't loaded an item's price yet, Grey Gold waits for it instead of recording a sale worth nothing. A grey item you sell by hand counts once its payment arrives; items that leave your bags without a payment (destroyed, equipped, used) are not sales.
+- **Where junk came from:** when junk arrives in your bags, Grey Gold notes its origin: the mob, chest, catch or container you looted, or mail, trade, bank or "other". When one loot window holds the same item from several corpses, each mob is credited with its own copies. When you sell, the oldest copies are matched first, so a stack from three different mobs becomes three Log rows.
 - **Buybacks** remove that sale from the daily, item, zone, mob and character totals. Achievements you already earned stay earned.
 - **Milestones:** 10s, 50s, 1g, 2g, 5g, 6.7g, 10g, 15g, 20g, 30g, 45g, 50g, 80g, 140g, 200g, then every 100g. They count every character on your account together.
 - **Storage:** everything is saved account-wide in `GreyGoldDB`. No libraries are bundled; the Bagnon data-bar feed is offered only when another addon provides the library. The window is built the first time you open it.
 
 ## Feedback and bug reports
 
-Found a bug or have an idea? [Open an issue on GitHub](../../issues) or leave a comment on the CurseForge page.
+Found a bug or have an idea? [Open an issue on GitHub](../../issues) or leave a comment on the [CurseForge page](https://www.curseforge.com/wow/addons/grey-gold).
 
 To help me fix a bug quickly, please include:
 - **Your Grey Gold version.** It's in the title bar of the stats window.
@@ -252,32 +254,7 @@ To help me fix a bug quickly, please include:
 
 ## Changelog
 
-### 2.2.0
-- **Achievements:** new milestone steps that start at 10 silver (10s, 50s, 1g, 2g, 5g, 6.7g, 10g, 15g, 20g, 30g, 45g, 50g, 80g, 140g, 200g, then every 100g), each with its own title, and an Achievements window showing when you reached each one.
-- **History by month and year**, next to daily and weekly, plus a "best month" record.
-- **Dropped by:** a new view on the Zones tab ranking mobs, chests and catches by the junk gold they gave you. These totals are kept per month, forever.
-- The sales log now keeps 5,000 sales per character (was 2,000).
-- A buyback now also lowers "bag slots freed".
-- The window redraws once per frame during a burst of sales.
-- The "Milestone celebrations" option is now called "Achievement announcements".
-
-### 2.1.0
-- New **Log** tab: every sale with date and time, and the mob, chest, catch, container, mail, trade or bank it came from. Notes for hand sales, buybacks and re-sales.
-- **Zones** tab: new **Farmed in** view (where you looted your junk) next to **Sold in**. Only junk you looted yourself gets zone credit.
-- **Items** and **Zones** tabs: Today, This week, last 30 days and All time filters.
-- Grey items you sell by hand now count, but only once the vendor pays. Destroyed or equipped greys never count, and nothing better than grey is ever recorded.
-- Buying an item back takes that sale out of your totals.
-- Next-milestone progress bar on the Overview, and in the minimap tooltip.
-- Junk in your bags right now: a data feed for Bagnon's data bar (and similar addons), and a small label next to the default backpack.
-- When your bags are full, a chat hint names your cheapest junk stack.
-- The window title shows the version number.
-- The Settings tab moved from 5th to 6th place.
-
-### 2.0.0: first release
-- Auto-sells every grey item the moment you open a vendor, in quick batches, and stops when the vendor closes.
-- Never sell list, Shift to skip selling once, and an optional chat summary.
-- Stats window with Overview, History, Items and Zones tabs, plus records, streaks and milestones.
-- Minimap button and addon compartment entry.
+See [CHANGELOG.md](CHANGELOG.md) for every change in every version.
 
 ## License
 
