@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: Grey Gold
-## Notes: Sells every grey item at any vendor and tracks the gold you earn.
-## Version: 2.0.0
+## Notes: Sells your grey junk at any vendor and shows which mobs and zones your gold came from.
+## Version: 2.2.0
 ## SavedVariables: GreyGoldDB
+## OptionalDeps: BagBrother
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
 ## AddonCompartmentFunc: GreyGold_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: GreyGold_OnAddonCompartmentEnter
@@ -10,6 +11,9 @@
 
 GreyGold.lua
 Stats.lua
+Sources.lua
+Achievements.lua
 Minimap.lua
+Broker.lua
 UI.lua
 Panels.lua

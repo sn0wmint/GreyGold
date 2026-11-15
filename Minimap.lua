@@ -66,13 +66,16 @@ function ns.FillTooltip(tt)
     tt:AddDoubleLine("Today", ns.Money(t.today.c, true), 1, 1, 1, 1, 1, 1)
     tt:AddDoubleLine("This week", ns.Money(t.week.c, true), 1, 1, 1, 1, 1, 1)
     tt:AddDoubleLine("All time", ns.Money(t.all.c, true), 1, 1, 1, 1, 1, 1)
-    local n, c = ns.ScanBags()
+    local n, c = ns.junk.n, ns.junk.c  -- kept current by the bag scan in Sources.lua
     tt:AddLine(" ")
     if n > 0 then
         tt:AddDoubleLine("Junk in bags now", format("%s  (%s)", ns.Num(n), ns.Money(c)), 0.62, 0.62, 0.62, 1, 1, 1)
     else
         tt:AddLine("No junk in your bags.", 0.62, 0.62, 0.62)
     end
+    local goal, left = ns.MilestoneProgress()
+    tt:AddDoubleLine("Next milestone " .. ns.Money(goal), ns.Money(left, true) .. " to go",
+        1, 0.82, 0, 1, 1, 1)
     tt:AddLine(" ")
     tt:AddLine("|cffffd100Left-click|r  open stats", 0.85, 0.85, 0.85)
     tt:AddLine("|cffffd100Right-click|r  settings", 0.85, 0.85, 0.85)
@@ -86,7 +89,7 @@ function ns.HandleClick(mouseButton)
     if IsShiftKeyDown() then
         ns.SetEnabled(not ns.db.enabled)
     elseif mouseButton == "RightButton" then
-        if open and ns.db.ui.tab == 5 then frame:Hide() else ns.ShowWindow(5) end
+        if open and ns.db.ui.tab == ns.TAB_SETTINGS then frame:Hide() else ns.ShowWindow(ns.TAB_SETTINGS) end
     else
         if open then frame:Hide() else ns.ShowWindow(1) end
     end
